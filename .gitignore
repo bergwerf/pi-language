@@ -1,0 +1,14 @@
+# Linux
+*~
+\#*
+.fuse_hidden*
+.directory
+.Trash-*
+
+# Golang
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
