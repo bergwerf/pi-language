@@ -40,10 +40,17 @@ Grammar
 The PI language has the following grammar:
 
 ```
-P,Q ::= PQ | (P) | y<-x. | y<-x;P | y->x. | y->x;P | +x;P | *P
+P,Q ::= +x;P | y<-x;P | y<-x. | y->x;P | y->x. | *P | PQ | (P)
 ```
 
 All variable names (here `x` and `y`) must match the regular expression
 `[a-zA-Z0-9_]+`. The special (reserved) channels are `Nat` and `U([0-9A-F]{4})`
 where the first capture group represents a hexadecimal Unicode code point.
 Shadowing a special channel is allowed (but not recommended).
+
+Garbage collection
+------------------
+Ideas for garbage collection (memory optimization):
++ Collect channels if all existing sender processes have finished.
++ Collect processes if the trigger channel is cleaned up (this may included
+  replicated processes).

@@ -1,0 +1,15 @@
+-- Print "Hello, World!" and exit.
++x;
+x->U0048; -- H
+x->U0065; -- e
+x->U006C; -- l
+x->U006C; -- l
+x->U006F; -- o
+x->U002C; -- ,
+x->U0020; --
+x->U0057; -- W
+x->U006F; -- o
+x->U0072; -- r
+x->U006C; -- l
+x->U0064; -- d
+x->U0021. -- !
