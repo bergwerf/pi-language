@@ -7,7 +7,7 @@ import (
 )
 
 // Allowed variable name pattern.
-var nameRe, _ = regexp.Compile("[a-zA-Z0-9]+")
+var nameRe, _ = regexp.Compile("^[a-zA-Z0-9]+$")
 
 // Tokens
 const (
@@ -40,9 +40,9 @@ type tok struct {
 // Process is the primary AST node for PI programs. I considered using AST
 // pointers to be pre-mature optimization.
 type Process struct {
-	t    int       // Node type
-	x, y string    // Variables
-	next []Process // Next processes
+	Type int       // Node type
+	X, Y string    // Variables
+	Next []Process // Next processes
 }
 
 // Parse parses PI program code and returns an AST.
@@ -132,15 +132,7 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 	}
 }
 
-// Helper to combine errors.
-func mergeErr(hd error, tl []error) []error {
-	if hd != nil {
-		return append([]error{hd}, tl...)
-	}
-	return tl
-}
-
-// Check variable token
+// Check variable token.
 func checkVariable(variable tok) (string, error) {
 	if variable.t != Variable {
 		return "", fmt.Errorf("expected variable token")
@@ -151,6 +143,14 @@ func checkVariable(variable tok) (string, error) {
 		return name, err
 	}
 	return name, nil
+}
+
+// Helper to combine errors.
+func mergeErr(hd error, tl []error) []error {
+	if hd != nil {
+		return append([]error{hd}, tl...)
+	}
+	return tl
 }
 
 // Extract source tokens and remove whitespace and comments. Illegal variable
