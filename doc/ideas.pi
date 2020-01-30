@@ -1,0 +1,35 @@
+-- Basic BNF grammar for PIcal
+-- P,Q ::= PQ | (P) | y<-x. | y<-x;P | y->x. | y->x;P | +x;P | *P
+--
+-- To allow somewhat easier programming, we allow reading and writing natural
+-- numbers and characters. For natural numbers we use a specific encoding, for
+-- characters we extend the language with a channel for each unicode code point.
+--
+-- A practical implementation allows comments by ignoring all content after a
+-- double dash until the next line feed.
+--
+-- Because the literature about the Pi calculus are long and very formal, I
+-- decided not to read much of it. Instead I implemented a fragment of it with
+-- some extensions after my own understanding and insight. I intend to write a
+-- procedure that checks if a given program result is stable (under different
+-- communication ordering).
+
+-- Hello world in PI: hello_world.pi
++x;
+x->U0048; -- H
+x->U0065; -- e
+x->U006C; -- l
+x->U006C; -- l
+x->U006F; -- o
+x->U002C; -- ,
+x->U0020; --
+x->U0057; -- W
+x->U006F; -- o
+x->U0072; -- r
+x->U006C; -- l
+x->U0064; -- d
+x->U0021. -- !
+
+-- Calculator
+-- TODO: Describe natural number encoding using signal count.
+-- TODO: Describe arithmetic using this encoding.
