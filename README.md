@@ -13,10 +13,9 @@ added to the basic Pi calculus.
 
 Hello, World!
 -------------
-This demonstrates the use of unicode output channels to print "Hello, World!".
-I view PI programs with font ligatures for arrows (I use FiraCode). I use
-Notepad++ for editing because it has a reasonable interface for defining a
-custom grammar for highlighting.
+This demonstrates the use of unicode channels to print "Hello, World!". The
+Unicode channels enable a PI program to read and write all Unicode characters.
+I view PI programs with font ligatures for arrows (I use FiraCode).
 
 ```
 -- Hello world in PI: hello_world.pi
@@ -35,3 +34,16 @@ x->U006C; -- l
 x->U0064; -- d
 x->U0021. -- !
 ```
+
+Grammar
+-------
+The PI language has the following grammar:
+
+```
+P,Q ::= PQ | (P) | y<-x. | y<-x;P | y->x. | y->x;P | +x;P | *P
+```
+
+All variable names (here `x` and `y`) must match the regular expression
+`[a-zA-Z0-9_]+`. The special (reserved) channels are `Nat` and `U([0-9A-F]{4})`
+where the first capture group represents a hexadecimal Unicode code point.
+Shadowing a special channel is allowed (but not recommended).
