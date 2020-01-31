@@ -12,11 +12,11 @@ var nameRe, _ = regexp.Compile("^[a-zA-Z0-9]+$")
 // Tokens
 const (
 	Plus = iota
-	LeftArrow
-	RightArrow
+	ReceiveSymbol
+	BindSymbol
+	SendSymbol
 	SemiColon
 	Period
-	Star
 	ParOpen
 	ParClose
 	Variable
@@ -25,10 +25,10 @@ const (
 
 // AST nodes
 const (
-	CreateChannel = iota
-	ReceiveChannel
-	SendChannel
-	ReplicateProcess
+	ASTCreate = iota
+	ASTReceive
+	ASTBind
+	ASTSend
 )
 
 // A token
@@ -40,9 +40,9 @@ type tok struct {
 // Process is the primary AST node for PI programs. I considered using AST
 // pointers to be pre-mature optimization.
 type Process struct {
-	Type int       // Node type
-	X, Y string    // Variables
-	Next []Process // Next processes
+	Type     int       // Node type
+	X, Y     string    // Variables
+	Children []Process // Child processes
 }
 
 // Parse parses PI program code and returns an AST.
@@ -77,9 +77,9 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 	// Plus: channel creation.
 	case Plus:
 		name, err1 := checkVariable(tokens[index+1])
-		next, end, err2 := parse(tokens, index+2)
+		children, end, err2 := parse(tokens, index+2)
 		err := mergeErr(err1, err2)
-		return []Process{Process{CreateChannel, name, "", next}}, end, err
+		return []Process{Process{ASTCreate, name, "", children}}, end, err
 
 	// Semicolon: return process after semi-colon.
 	case SemiColon:
@@ -89,26 +89,23 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 	case Period:
 		return []Process{}, index + 1, []error{}
 
-	// Variable: expect a receive or send.
+	// Variable: expect a bind, receive or send.
 	case Variable:
 		x, err1 := checkVariable(tokens[index])
 		y, err2 := checkVariable(tokens[index+2])
-		next, end, err3 := parse(tokens, index+3)
+		children, end, err3 := parse(tokens, index+3)
 		err := mergeErr(err1, mergeErr(err2, err3))
 
 		switch tokens[index+1].t {
-		case LeftArrow:
-			return []Process{Process{ReceiveChannel, x, y, next}}, end, err
-		case RightArrow:
-			return []Process{Process{SendChannel, x, y, next}}, end, err
+		case ReceiveSymbol:
+			return []Process{Process{ASTReceive, x, y, children}}, end, err
+		case BindSymbol:
+			return []Process{Process{ASTBind, x, y, children}}, end, err
+		case SendSymbol:
+			return []Process{Process{ASTSend, x, y, children}}, end, err
 		default:
 			return []Process{}, index, []error{fmt.Errorf("unexpected token")}
 		}
-
-	// Star: mark next process as replicated.
-	case Star:
-		next, end, err := parse(tokens, index+1)
-		return []Process{Process{ReplicateProcess, "", "", next}}, end, err
 
 	// ParOpen: aggregate all processes until the first ParClose.
 	case ParOpen:
@@ -116,9 +113,9 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 		all := make([]Process, 0)
 		err := make([]error, 0)
 		for tokens[index].t != ParClose {
-			next, index1, err1 := parse(tokens, index)
+			children, index1, err1 := parse(tokens, index)
 			index = index1 // Prevent shadowing of index.
-			all = append(all, next...)
+			all = append(all, children...)
 			err = append(err, err1...)
 			// Check if a closing parenthesis was missing or we ran out of tokens.
 			if tokens[index].t == EOFMark {
@@ -176,8 +173,6 @@ func tokenize(source string) []tok {
 		case '.':
 			tokens = append(tokens, v, tok{Period, ""})
 			acc = ""
-		case '*':
-			tokens = append(tokens, tok{Star, ""})
 		case '(':
 			tokens = append(tokens, tok{ParOpen, ""})
 		case ')':
@@ -187,11 +182,15 @@ func tokenize(source string) []tok {
 			case "--":
 				comment = true
 			case "<-":
-				tokens = append(tokens, v, tok{LeftArrow, ""})
+				tokens = append(tokens, v, tok{ReceiveSymbol, ""})
+				acc = ""
+				i++
+			case "<<":
+				tokens = append(tokens, v, tok{BindSymbol, ""})
 				acc = ""
 				i++
 			case "->":
-				tokens = append(tokens, v, tok{RightArrow, ""})
+				tokens = append(tokens, v, tok{SendSymbol, ""})
 				acc = ""
 				i++
 			default:

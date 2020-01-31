@@ -8,7 +8,7 @@ import (
 
 func main() {
 	// Parse all files given by the command line arguments.
-	all := make([]Process, 0)
+	proc := make([]Process, 0)
 	for _, name := range os.Args[1:] {
 		// Try to read.
 		bytes, err := ioutil.ReadFile(name)
@@ -17,8 +17,8 @@ func main() {
 		}
 
 		// Try to parse.
-		proc, errors := Parse(string(bytes))
-		all = append(all, proc...)
+		children, errors := Parse(string(bytes))
+		proc = append(proc, children...)
 		if len(errors) > 0 {
 			for _, err := range errors {
 				println(err.Error())
