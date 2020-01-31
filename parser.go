@@ -15,7 +15,7 @@ const (
 	ReceiveSymbol
 	BindSymbol
 	SendSymbol
-	SemiColon
+	Semicolon
 	Period
 	ParOpen
 	ParClose
@@ -65,6 +65,10 @@ func Parse(source string) ([]Process, []error) {
 
 // Parse tokens and return AST. This validates variable names. This parser is a
 // bit ad-hoc (but minimal), using a DFA would be nicer.
+//
+// Slightly more variations than the formal grammar are allowed: receive and
+// bind statements without subsequent process, no Semicolon before a ParOpen,
+// duplicate Semicolon or Period.
 func parse(tokens []tok, index int) ([]Process, int, []error) {
 	// Check bounds. Note that we always end with ParClose and EOF. The ParOpen
 	// case already generates an error for this case, we only move the index to
@@ -76,13 +80,13 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 	switch tokens[index].t {
 	// Plus: channel creation.
 	case Plus:
-		name, err1 := checkVariable(tokens[index+1])
+		name, err1 := checkVariableToken(tokens[index+1])
 		children, end, err2 := parse(tokens, index+2)
 		err := mergeErr(err1, err2)
 		return []Process{Process{ASTCreate, name, "", children}}, end, err
 
 	// Semicolon: return process after semi-colon.
-	case SemiColon:
+	case Semicolon:
 		return parse(tokens, index+1)
 
 	// Period: return empty process list.
@@ -91,8 +95,8 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 
 	// Variable: expect a bind, receive or send.
 	case Variable:
-		x, err1 := checkVariable(tokens[index])
-		y, err2 := checkVariable(tokens[index+2])
+		x, err1 := checkVariableToken(tokens[index])
+		y, err2 := checkVariableToken(tokens[index+2])
 		children, end, err3 := parse(tokens, index+3)
 		err := mergeErr(err1, mergeErr(err2, err3))
 
@@ -114,7 +118,7 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 		err := make([]error, 0)
 		for tokens[index].t != ParClose {
 			children, index1, err1 := parse(tokens, index)
-			index = index1 // Prevent shadowing of index.
+			index = index1 // Golang would otherwise shadow index.
 			all = append(all, children...)
 			err = append(err, err1...)
 			// Check if a closing parenthesis was missing or we ran out of tokens.
@@ -129,8 +133,8 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 	}
 }
 
-// Check variable token.
-func checkVariable(variable tok) (string, error) {
+// Check if the given token is a valid variable token.
+func checkVariableToken(variable tok) (string, error) {
 	if variable.t != Variable {
 		return "", fmt.Errorf("expected variable token")
 	}
@@ -140,14 +144,6 @@ func checkVariable(variable tok) (string, error) {
 		return name, err
 	}
 	return name, nil
-}
-
-// Helper to combine errors.
-func mergeErr(hd error, tl []error) []error {
-	if hd != nil {
-		return append([]error{hd}, tl...)
-	}
-	return tl
 }
 
 // Extract source tokens and remove whitespace and comments. Illegal variable
@@ -168,7 +164,7 @@ func tokenize(source string) []tok {
 		case '+':
 			tokens = append(tokens, tok{Plus, ""})
 		case ';':
-			tokens = append(tokens, v, tok{SemiColon, ""})
+			tokens = append(tokens, v, tok{Semicolon, ""})
 			acc = ""
 		case '.':
 			tokens = append(tokens, v, tok{Period, ""})
