@@ -20,85 +20,91 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 	// Global channel identifier sequence.
 	allocSequence := reservedLength
 
-	// Stack of scheduled processes and map of subscriptions.
-	stack := make([]Node, 0, len(proc))
-	sub := make(map[uint]*list.List)
+	stack1 := make([]Node, 0)        // Primary stack
+	stack2 := make([]Node, 0)        // Secondary stack (allocate and sent)
+	sub := make(map[uint]*list.List) // Subscribers
 
 	// Queue the input program.
 	for _, p := range proc {
-		stack = append(stack, Node{p, nil})
+		stack1 = append(stack1, Node{p, nil})
 	}
 
-	// Run simulation until all processes are finished (the stack is empty).
-	for len(stack) > 0 {
-		// Remove node from stack.
+	// Run simulation until all processes are finished (the whole stack is empty).
+	for len(stack1)+len(stack2) > 0 {
 		var node Node
-		node, stack = stack[len(stack)-1], stack[:len(stack)-1]
 
-		switch node.Proc.Type {
-		case PIAllocate:
-			// Allocate new channel ID and push child nodes on the stack.
-			assert(len(node.Refs) == int(node.Proc.X.Value))
-			allocSequence++
-			refs := append(node.Refs, allocSequence)
-			for _, p := range node.Proc.Children {
-				stack = append(stack, Node{p, refs})
+		// Empty the primary stack.
+		for len(stack1) > 0 {
+			node, stack1 = popStack(stack1)
+
+			if node.Proc.Type == PIReceiveOne || node.Proc.Type == PIReceiveAll {
+				// Move node to subscription map.
+				assert(len(node.Refs) == int(node.Proc.Y.Value))
+				channel := node.Proc.X.ID(node)
+				addSub(sub, channel, node)
+			} else {
+				// Move node to secondary stack.
+				stack2 = append(stack2, node)
 			}
+		}
 
-		case PIReceiveOne:
-			fallthrough
-		case PIReceiveAll:
-			// Move node to subscription map (effectively pausing it).
-			assert(len(node.Refs) == int(node.Proc.Y.Value))
-			channel := node.Proc.X.ID(node)
-			addSub(sub, channel, node)
+		// Pop secondary stack.
+		if len(stack2) > 0 {
+			node, stack2 = popStack(stack2)
 
-		case PISend:
-			channel := node.Proc.X.ID(node)
-			message := node.Proc.Y.ID(node)
-
-			// Check for interface channels.
-			if channel == stdinReadID {
-				// Try to read next byte.
-				if b, err := bufin.ReadByte(); err == nil {
-					// Push a byte channel send to the stack.
-					target := Var{true, uint(b)}
-					carrier := Var{true, message}
-					trigger := &Proc{PISend, target, carrier, nil, nil}
-					stack = append(stack, Node{trigger, nil})
+			if node.Proc.Type == PIAllocate {
+				// Allocate new channel ID and push child nodes on the primary stack.
+				assert(len(node.Refs) == int(node.Proc.X.Value))
+				allocSequence++
+				refs := append(node.Refs, allocSequence)
+				for _, p := range node.Proc.Children {
+					stack1 = append(stack1, Node{p, refs})
 				}
-			} else if stdoutIDOffset <= channel && channel < stdinReadID {
-				// Write byte to stdout.
-				b := byte(channel - stdoutIDOffset)
-				output.Write([]byte{b})
-			}
+			} else if node.Proc.Type == PISend {
+				// Get target channel and message channel.
+				channel := node.Proc.X.ID(node)
+				message := node.Proc.Y.ID(node)
 
-			// Push subscribed nodes on the stack.
-			//
-			// TODO: This eager strategy does not work well with parallelism. Consider
-			// the following example: `y<-x;z<-y;x->z. a->x;b->a;c<-b.`
-			if subs, nonEmpty := sub[channel]; nonEmpty {
-				for n := subs.Front(); n != nil; n = n.Next() {
-					node := n.Value.(Node)
-					assert(node.Proc.X.ID(node) == channel)
-					assert(len(node.Refs) == int(node.Proc.Y.Value))
-
-					// Add message to node references and push children on the stack.
-					refs := append(node.Refs, message)
-					for _, p := range node.Proc.Children {
-						stack = append(stack, Node{p, refs})
+				// Check if this is an interface channel.
+				if channel == stdinReadID {
+					// Try to read next byte.
+					if b, err := bufin.ReadByte(); err == nil {
+						// Push a byte channel send to the secondary stack.
+						target := Var{true, uint(b)}
+						carrier := Var{true, message}
+						trigger := &Proc{PISend, target, carrier, nil, nil}
+						stack2 = append(stack2, Node{trigger, nil})
 					}
+				} else if stdoutIDOffset <= channel && channel < stdinReadID {
+					// Write byte to stdout.
+					b := byte(channel - stdoutIDOffset)
+					output.Write([]byte{b})
+				}
 
-					// Remove ASTReceiveOne subscription.
-					if node.Proc.Type == PIReceiveOne {
-						subs.Remove(n)
+				// Push subscribed nodes on the primary stack.
+				if subs, nonEmpty := sub[channel]; nonEmpty {
+					for n := subs.Front(); n != nil; n = n.Next() {
+						node := n.Value.(Node)
+						assert(node.Proc.X.ID(node) == channel)
+						assert(len(node.Refs) == int(node.Proc.Y.Value))
+
+						// Add message to node references and push children on the stack.
+						refs := append(node.Refs, message)
+						for _, p := range node.Proc.Children {
+							stack1 = append(stack1, Node{p, refs})
+						}
+
+						// Remove PIReceiveOne subscription.
+						if node.Proc.Type == PIReceiveOne {
+							subs.Remove(n)
+						}
 					}
 				}
-			}
 
-			// Push child nodes on the stack.
-			for _, p := range node.Proc.Children {
-				stack = append(stack, Node{p, node.Refs})
+				// Push child nodes on the primary stack.
+				for _, p := range node.Proc.Children {
+					stack1 = append(stack1, Node{p, node.Refs})
+				}
 			}
 		}
 	}
@@ -113,4 +119,8 @@ func addSub(sub map[uint]*list.List, channel uint, node Node) {
 		subs.PushBack(node)
 		sub[channel] = subs
 	}
+}
+
+func popStack(stack []Node) (Node, []Node) {
+	return stack[len(stack)-1], stack[:len(stack)-1]
 }
