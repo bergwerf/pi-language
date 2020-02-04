@@ -1,15 +1,16 @@
--- Print "Hello, World!" and exit.
+-- Print "Hello, World!\n" and exit.
 +x;
-x->U0048; -- H
-x->U0065; -- e
-x->U006C; -- l
-x->U006C; -- l
-x->U006F; -- o
-x->U002C; -- ,
-x->U0020; --
-x->U0057; -- W
-x->U006F; -- o
-x->U0072; -- r
-x->U006C; -- l
-x->U0064; -- d
-x->U0021. -- !
+x->stdout__H;
+x->stdout__e;
+x->stdout__l;
+x->stdout__l;
+x->stdout__o;
+x->stdout_2C; -- ,
+x->stdout_20; -- <space>
+x->stdout__W;
+x->stdout__o;
+x->stdout__r;
+x->stdout__l;
+x->stdout__d;
+x->stdout_21; -- !
+x->stdout_0A. -- \n

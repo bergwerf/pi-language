@@ -18,21 +18,22 @@ Unicode channels enable a PI program to read and write all Unicode characters.
 I view PI programs with font ligatures for arrows (I use FiraCode).
 
 ```
--- Hello world in PI: hello_world.pi
+-- Print "Hello, World!\n" and exit.
 +x;
-x->U0048; -- H
-x->U0065; -- e
-x->U006C; -- l
-x->U006C; -- l
-x->U006F; -- o
-x->U002C; -- ,
-x->U0020; --
-x->U0057; -- W
-x->U006F; -- o
-x->U0072; -- r
-x->U006C; -- l
-x->U0064; -- d
-x->U0021. -- !
+x->stdout__H;
+x->stdout__e;
+x->stdout__l;
+x->stdout__l;
+x->stdout__o;
+x->stdout_2C; -- ,
+x->stdout_20; -- <space>
+x->stdout__W;
+x->stdout__o;
+x->stdout__r;
+x->stdout__l;
+x->stdout__d;
+x->stdout_21; -- !
+x->stdout_0A. -- \n
 ```
 
 Grammar
@@ -43,15 +44,27 @@ The PI language has the following grammar:
 P,Q ::= +x;P | y<-x;P | y<<x;P | y->x;P | y->x. | PQ | (P)
 ```
 
-All variable names (here `x` and `y`) must match the regular expression
-`[a-zA-Z0-9_]+`. The special (reserved) channels are `Nat` and `U([0-9A-F]{4})`
-where the first capture group represents a hexadecimal Unicode code point.
+All variable names must match the regular expression `[a-zA-Z0-9_]+`. There are
+special interface channels to interact with input and output without introducing
+data types. These are:
+- `stdin_read` triggers a byte read.
+- `stdin_[0-9A-F]{2}` triggers when a specific byte is read.
+- `stdout_[0-9A-F]{2}` writes bytes to the standard output when triggered.
+- `stdin__[a-zA-Z0-9]` and `stdout__[a-zA-Z0-9]` are aliases.
+
 Shadowing a special channel is allowed (but not recommended). I replaced the
-replication operator with a bind operator which will respawn the subsequent
+replication operator with a subscribe operator which will respawn the subsequent
 process whenever a new element is received on the subscribed channel. I believe
 this is more practical and easier to define. To prove that Turing completeness
 is retained one could try to program a beta reduction algorithm for the Lambda
 calculus in PI.
+
+Syntax shortcuts
+----------------
+I considered introducing some syntactic sugar or a way to define macros (for
+example to send multiple channels to a function, or to send an new channel that
+is only used as trigger), but I decided this goes against the initial goals of
+keeping extreme minimalism and building a self-hosted compiler.
 
 Garbage collection
 ------------------

@@ -1,0 +1,65 @@
+-- Convert the input string to upper case.
+
++forward;(
+  -- Forward all messages through in to out and trigger a byte read.
+  args<<forward; in<-args; out<-args; m<<in; m->out; m->stdin_read.
+
+  -- It is still unclear how we should wait with sending to stdin_read until all
+  -- forwarders are initialized.
+
+  -- Forward uppercase letters.
+  +c; c->forward; stdin__A->c; stdout__A->c.
+  +c; c->forward; stdin__B->c; stdout__B->c.
+  +c; c->forward; stdin__C->c; stdout__C->c.
+  +c; c->forward; stdin__D->c; stdout__D->c.
+  +c; c->forward; stdin__E->c; stdout__E->c.
+  +c; c->forward; stdin__F->c; stdout__F->c.
+  +c; c->forward; stdin__G->c; stdout__G->c.
+  +c; c->forward; stdin__H->c; stdout__H->c.
+  +c; c->forward; stdin__I->c; stdout__I->c.
+  +c; c->forward; stdin__J->c; stdout__J->c.
+  +c; c->forward; stdin__K->c; stdout__K->c.
+  +c; c->forward; stdin__L->c; stdout__L->c.
+  +c; c->forward; stdin__M->c; stdout__M->c.
+  +c; c->forward; stdin__N->c; stdout__N->c.
+  +c; c->forward; stdin__O->c; stdout__O->c.
+  +c; c->forward; stdin__P->c; stdout__P->c.
+  +c; c->forward; stdin__Q->c; stdout__Q->c.
+  +c; c->forward; stdin__R->c; stdout__R->c.
+  +c; c->forward; stdin__S->c; stdout__S->c.
+  +c; c->forward; stdin__T->c; stdout__T->c.
+  +c; c->forward; stdin__U->c; stdout__U->c.
+  +c; c->forward; stdin__V->c; stdout__V->c.
+  +c; c->forward; stdin__W->c; stdout__W->c.
+  +c; c->forward; stdin__X->c; stdout__X->c.
+  +c; c->forward; stdin__Y->c; stdout__Y->c.
+  +c; c->forward; stdin__Z->c; stdout__Z->c.
+
+  -- Convert lowercase input to uppercase output.
+  +c; c->forward; stdin__a->c; stdout__A->c.
+  +c; c->forward; stdin__b->c; stdout__B->c.
+  +c; c->forward; stdin__c->c; stdout__C->c.
+  +c; c->forward; stdin__d->c; stdout__D->c.
+  +c; c->forward; stdin__e->c; stdout__E->c.
+  +c; c->forward; stdin__f->c; stdout__F->c.
+  +c; c->forward; stdin__g->c; stdout__G->c.
+  +c; c->forward; stdin__h->c; stdout__H->c.
+  +c; c->forward; stdin__i->c; stdout__I->c.
+  +c; c->forward; stdin__j->c; stdout__J->c.
+  +c; c->forward; stdin__k->c; stdout__K->c.
+  +c; c->forward; stdin__l->c; stdout__L->c.
+  +c; c->forward; stdin__m->c; stdout__M->c.
+  +c; c->forward; stdin__n->c; stdout__N->c.
+  +c; c->forward; stdin__o->c; stdout__O->c.
+  +c; c->forward; stdin__p->c; stdout__P->c.
+  +c; c->forward; stdin__q->c; stdout__Q->c.
+  +c; c->forward; stdin__r->c; stdout__R->c.
+  +c; c->forward; stdin__s->c; stdout__S->c.
+  +c; c->forward; stdin__t->c; stdout__T->c.
+  +c; c->forward; stdin__u->c; stdout__U->c.
+  +c; c->forward; stdin__v->c; stdout__V->c.
+  +c; c->forward; stdin__w->c; stdout__W->c.
+  +c; c->forward; stdin__x->c; stdout__X->c.
+  +c; c->forward; stdin__y->c; stdout__Y->c.
+  +c; c->forward; stdin__z->c; stdout__Z->c.
+)

@@ -7,13 +7,13 @@ import (
 )
 
 // Allowed variable name pattern.
-var nameRe, _ = regexp.Compile("^[a-zA-Z0-9]+$")
+var nameRe, _ = regexp.Compile("^[a-zA-Z0-9_]+$")
 
 // Tokens
 const (
 	Plus = iota
-	ReceiveSymbol
-	BindSymbol
+	ReceiveOneSymbol
+	ReceiveAllSymbol
 	SendSymbol
 	Semicolon
 	Period
@@ -25,10 +25,10 @@ const (
 
 // AST nodes
 const (
-	ASTCreate = iota
-	ASTReceive
-	ASTBind
-	ASTSend
+	PIAllocate = iota
+	PIReceiveOne
+	PIReceiveAll
+	PISend
 )
 
 // A token
@@ -37,16 +37,15 @@ type tok struct {
 	name string
 }
 
-// Process is the primary AST node for PI programs. I considered using AST
-// pointers to be pre-mature optimization.
+// Process is the primary AST node for PI programs.
 type Process struct {
-	Type     int       // Node type
-	X, Y     string    // Variables
-	Children []Process // Child processes
+	Type     int        // Node type
+	X, Y     string     // Variable names
+	Children []*Process // Child processes
 }
 
 // Parse parses PI program code and returns an AST.
-func Parse(source string) ([]Process, []error) {
+func Parse(source string) ([]*Process, []error) {
 	// Tokenize and parse input. To simplify parsing we add parentheses around the
 	// entire source (allowing parallel processes in the global scope), and a
 	// padding tokens at the end (for an easier out of bounds check).
@@ -69,12 +68,12 @@ func Parse(source string) ([]Process, []error) {
 // Slightly more variations than the formal grammar are allowed: receive and
 // bind statements without subsequent process, no Semicolon before a ParOpen,
 // duplicate Semicolon or Period.
-func parse(tokens []tok, index int) ([]Process, int, []error) {
+func parse(tokens []tok, index int) ([]*Process, int, []error) {
 	// Check bounds. Note that we always end with ParClose and EOF. The ParOpen
 	// case already generates an error for this case, we only move the index to
 	// the EOF token.
 	if index+2 >= len(tokens) {
-		return []Process{}, len(tokens) - 1, []error{}
+		return nil, len(tokens) - 1, nil
 	}
 
 	switch tokens[index].t {
@@ -83,7 +82,7 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 		name, err1 := checkVariableToken(tokens[index+1])
 		children, end, err2 := parse(tokens, index+2)
 		err := mergeErr(err1, err2)
-		return []Process{Process{ASTCreate, name, "", children}}, end, err
+		return []*Process{&Process{PIAllocate, name, "", children}}, end, err
 
 	// Semicolon: return process after semi-colon.
 	case Semicolon:
@@ -91,30 +90,30 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 
 	// Period: return empty process list.
 	case Period:
-		return []Process{}, index + 1, []error{}
+		return nil, index + 1, nil
 
 	// Variable: expect a bind, receive or send.
 	case Variable:
-		x, err1 := checkVariableToken(tokens[index])
-		y, err2 := checkVariableToken(tokens[index+2])
+		y, err1 := checkVariableToken(tokens[index])
+		x, err2 := checkVariableToken(tokens[index+2])
 		children, end, err3 := parse(tokens, index+3)
 		err := mergeErr(err1, mergeErr(err2, err3))
 
 		switch tokens[index+1].t {
-		case ReceiveSymbol:
-			return []Process{Process{ASTReceive, x, y, children}}, end, err
-		case BindSymbol:
-			return []Process{Process{ASTBind, x, y, children}}, end, err
+		case ReceiveOneSymbol:
+			return []*Process{&Process{PIReceiveOne, x, y, children}}, end, err
+		case ReceiveAllSymbol:
+			return []*Process{&Process{PIReceiveAll, x, y, children}}, end, err
 		case SendSymbol:
-			return []Process{Process{ASTSend, x, y, children}}, end, err
+			return []*Process{&Process{PISend, x, y, children}}, end, err
 		default:
-			return []Process{}, index, []error{fmt.Errorf("unexpected token")}
+			return nil, index, []error{fmt.Errorf("unexpected token")}
 		}
 
 	// ParOpen: aggregate all processes until the first ParClose.
 	case ParOpen:
 		index++
-		all := make([]Process, 0)
+		all := make([]*Process, 0)
 		err := make([]error, 0)
 		for tokens[index].t != ParClose {
 			children, index1, err1 := parse(tokens, index)
@@ -129,7 +128,7 @@ func parse(tokens []tok, index int) ([]Process, int, []error) {
 		return all, index + 1, err
 
 	default:
-		return []Process{}, index, []error{fmt.Errorf("unexpected token")}
+		return nil, index, []error{fmt.Errorf("unexpected token")}
 	}
 }
 
@@ -178,11 +177,11 @@ func tokenize(source string) []tok {
 			case "--":
 				comment = true
 			case "<-":
-				tokens = append(tokens, v, tok{ReceiveSymbol, ""})
+				tokens = append(tokens, v, tok{ReceiveOneSymbol, ""})
 				acc = ""
 				i++
 			case "<<":
-				tokens = append(tokens, v, tok{BindSymbol, ""})
+				tokens = append(tokens, v, tok{ReceiveAllSymbol, ""})
 				acc = ""
 				i++
 			case "->":

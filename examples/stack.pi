@@ -1,0 +1,15 @@
+-- TODO: Create a channel stack with a push and pop interface.
+-- The following is how such a stack might be used.
+
+-- Create a stack x.
++c; c->stack;
+x_push<-c;
+x_pop<-c;
+x_empty<-c;
+
+-- Push two channels to the stack.
++y; y->x_push;
++z; z->x_push;
+
+-- Pop top channel.
++c; c->x_pop; top<-c.
