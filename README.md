@@ -46,18 +46,24 @@ P,Q ::= +x;P | y<-x;P | y<<x;P | y->x;P | y->x. | PQ | (P)
 
 All variable names must match the regular expression `[a-zA-Z0-9_]+`. There are
 special interface channels to interact with input and output without introducing
-data types. These are:
+data types. The interface channels are:
 - `stdin_read` triggers a byte read.
 - `stdin_[0-9A-F]{2}` triggers when a specific byte is read.
 - `stdout_[0-9A-F]{2}` writes bytes to the standard output when triggered.
 - `stdin__[a-zA-Z0-9]` and `stdout__[a-zA-Z0-9]` are aliases.
 
-Shadowing a special channel is allowed (but not recommended). I replaced the
-replication operator with a subscribe operator which will respawn the subsequent
-process whenever a new element is received on the subscribed channel. I believe
-this is more practical and easier to define. To prove that Turing completeness
-is retained one could try to program a beta reduction algorithm for the Lambda
-calculus in PI.
+I replaced the replication operator with a subscribe operator which will respawn
+the subsequent process whenever a new element is received on the subscribed
+channel. I believe this is more practical and easier to define. To prove that
+Turing completeness is retained one could try to program a beta reduction
+algorithm for the Lambda calculus in PI.
+
+Extensions
+----------
+To make this language more practical there is support for comments (all text
+after `--` until the next newline is ignored) and some pre-processing:
+- `#global: .*\n` declares a global channel.
+- `#attach: .*\n` imports all processes and global names from the given file.
 
 Syntax shortcuts
 ----------------

@@ -1,0 +1,26 @@
+{
+  "scopeName": "source.pi",
+  "name": "PI",
+  "fileTypes": [
+    "pi"
+  ],
+  "patterns": [
+    {
+      "name": "comment",
+      "begin": "--",
+      "end": "$"
+    },
+    {
+      "name": "keyword.operator",
+      "match": "->|\\+|,|;|\\.|<<|<-"
+    },
+    {
+      "name": "keyword.other",
+      "match": "#attach:"
+    },
+    {
+      "name": "keyword.other",
+      "match": "#global:"
+    }
+  ]
+}

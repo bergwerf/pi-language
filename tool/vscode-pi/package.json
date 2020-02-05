@@ -1,0 +1,27 @@
+{
+  "name": "vscode-pi",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": ">=0.10.0"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "pi",
+        "aliases": [
+          "PI"
+        ],
+        "extensions": [
+          ".pi"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "pi",
+        "scopeName": "source.pi",
+        "path": "./pi.json"
+      }
+    ]
+  }
+}
