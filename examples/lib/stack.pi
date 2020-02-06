@@ -7,8 +7,8 @@ r<<stack;
     -- Empty item
     +empty_item;(
       ->empty_item;->ready.
-      <<empty_item; c<-_pop; cascade<-c; tt,c,empty_item->c; +do;(
-        do->cascade;->cascade.
+      <<empty_item; c<-_pop; cascade<-c; tt,c,empty_item->c; +b;do;(
+        b->cascade; do,->b.
         <-do;->empty_item.
       )
     )
@@ -16,8 +16,8 @@ r<<stack;
     -- Push item
     a<<push; x<-a; +ready;ready->a; +c;c->_pop; ff->c; _,_,prev<-c; +item;(
       ->item;->ready.
-      <<item; c<-_pop; cascade<-c; ff,x,item->c; +do;(
-        do->cascade;->cascade.
+      <<item; c<-_pop; cascade<-c; ff,x,item->c; +b,do;(
+        b->cascade; do,->cascade.
         <-do;->prev.
       )
     )

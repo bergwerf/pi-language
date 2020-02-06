@@ -9,15 +9,17 @@ c<<switch;
   +set_tt,set_ff,value,_val,get_tt,get_ff,ready;
   set_tt,set_ff,value,ready->c;(
     ->get_tt;->ready.
-    <<get_tt; c<-_val; keep,t,f<-c; ->t; +do;(
-      do->keep;->keep.
-      <-do;->get_tt.
+    <<get_tt; c<-_val; keep,t,<-c; +b,if,else;(
+      b->keep; if,else->b.
+      <-if;->get_tt;->t.
+      <-else;->t.
     )
-    <<get_ff; c<-_val; keep,t,f<-c; ->f; +do;(
-      do->keep;->keep.
-      <-do;->get_ff.
+    <<get_ff; c<-_val; keep,,f<-c; +b,if,else;(
+      b->keep; if,else->b.
+      <-if;->get_ff;->f.
+      <-else;->f.
     )
     ready<<set_tt; +c;c->_val; ff,,->c; ->get_tt;->ready.
     ready<<set_ff; +c;c->_val; ff,,->c; ->get_ff;->ready.
-    c<<value; t,f<-c; +cc;cc->_val; tt,t,f->cc.
+    c<<value; +cc;cc->_val; t,f<-c; tt,t,f->cc.
   )

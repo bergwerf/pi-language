@@ -2,6 +2,7 @@ package main
 
 import (
 	"container/list"
+	"fmt"
 	"io"
 )
 
@@ -68,21 +69,33 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 				channel := node.Proc.Channel.ID(node)
 				message := node.Proc.Message.ID(node)
 
-				// Check if this is an interface channel.
-				if channel == stdinReadID {
+				// Check for:
+				// + Standard input byte read channel.
+				// + Standard output byte write channel.
+				// + Debug info channel.
+				if channel == specialChannels["stdin_read"] {
 					// Wait for next byte (or EOF)
 					buf := make([]byte, 1)
 					if _, err := input.Read(buf); err == nil {
 						// Push a byte channel send to the secondary stack.
-						target := Var{true, uint(buf[0])}
-						carrier := Var{true, message}
+						target := Var{true, uint(buf[0]), "<stdin>"}
+						carrier := Var{true, message, "<carrier>"}
+						trigger := &Proc{PISend, target, carrier, nil}
+						stack2 = append(stack2, Node{trigger, nil})
+					} else if err == io.EOF {
+						// Push an EOF send.
+						target := Var{true, specialChannels["stdin_EOF"], "stdin_EOF"}
+						carrier := Var{true, message, "<carrier>"}
 						trigger := &Proc{PISend, target, carrier, nil}
 						stack2 = append(stack2, Node{trigger, nil})
 					}
-				} else if stdoutIDOffset <= channel && channel < stdinReadID {
+				} else if stdoutIDOffset <= channel && channel < stdoutIDOffset+256 {
 					// Write byte to stdout.
 					b := byte(channel - stdoutIDOffset)
 					output.Write([]byte{b})
+				} else if channel == specialChannels["debug"] {
+					// Print message information.
+					printDebugInfo(sub, message, node.Proc.Message)
 				}
 
 				// Push subscribed nodes on the primary stack.
@@ -112,6 +125,24 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 			}
 		}
 	}
+}
+
+// Print debug information for the given variable.
+func printDebugInfo(sub map[uint]*list.List, id uint, v Var) {
+	fmt.Printf("--- START DEBUG INFO ---")
+	fmt.Printf("name: %v\n", v.Name)
+	if subs, nonEmpty := sub[id]; nonEmpty {
+		fmt.Printf("subscribers:\n")
+		for n := subs.Front(); n != nil; n = n.Next() {
+			// Next time we need this it may be more useful to print the source
+			// location at which this process is defined.
+			node := n.Value.(Node)
+			fmt.Printf("- node of type %v\n", node.Proc.Type)
+		}
+	} else {
+		println("no subscribers")
+	}
+	fmt.Printf("--- END DEBUG INFO ---")
 }
 
 // Add key and value to subscriber multimap.

@@ -36,7 +36,8 @@ data types. The interface channels are:
 - `stdin_[0-9A-F]{2}` triggers when a specific byte is read.
 - `stdout_[0-9A-F]{2}` writes bytes to the standard output when triggered.
 - `stdin__[a-zA-Z0-9]` and `stdout__[a-zA-Z0-9]` are aliases.
-- `stdin_eof` triggers when EOF is reached.
+- `stdin_EOF` triggers when the stdin EOF is reached.
+- `debug` prints information about any channel sent to it.
 
 I replaced the replication operator with a subscribe operator which will respawn
 the subsequent process whenever a new element is received on the subscribed

@@ -17,9 +17,14 @@ var (
 	stdoutHexRe, _ = regexp.Compile("^stdout_([0-9A-F]{2})$")
 	stdoutANRe, _  = regexp.Compile("^stdout__([a-zA-Z0-9A-F])$")
 
-	stdinReadName  = "stdin_read"
-	stdinReadID    = uint(512)
-	reservedLength = uint(513)
+	// Other channels
+	specialChannels = map[string]uint{
+		"stdin_read": uint(512),
+		"stdin_EOF":  uint(513),
+		"debug":      uint(514),
+	}
+
+	reservedLength = uint(515)
 )
 
 // Proc types
@@ -36,8 +41,9 @@ const (
 
 // Var represents a variable.
 type Var struct {
-	Raw   bool // Raw variable ID (for interface channels)
-	Value uint // Variable index or ID
+	Raw   bool   // Raw variable ID (for interface channels)
+	Value uint   // Variable index or ID
+	Name  string // Name in source code (for debugging)
 }
 
 // ID returns the ID this variable is bound to on the given node.
@@ -86,8 +92,8 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 
 		switch p.Type {
 		case ASTCreate:
-			created := Var{false, seq}
-			children := ProcessProgram(p.Children, seq+1, bindName(bound, p.R[0], created), err)
+			created := Var{false, seq, p.R[0]}
+			children := ProcessProgram(p.Children, seq+1, bindName(bound, created), err)
 			proc = append(proc, &Proc{PINewRef, created, Var{}, children})
 
 		case ASTReceiveOne:
@@ -96,7 +102,7 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 			subscribeType := pick(p.Type == ASTReceiveOne, PISubsOne, PISubsAll)
 			if len(p.L) == 1 {
 				channel := resolveName(p.R[0], bound, err)
-				message := Var{false, seq}
+				message := Var{false, seq, p.L[0]}
 
 				if len(p.L[0]) == 0 {
 					// Pop message right after receiving it.
@@ -106,7 +112,7 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 					}})
 				} else {
 					// Bind message to the next reference index.
-					children := ProcessProgram(p.Children, seq+1, bindName(bound, p.L[0], message), err)
+					children := ProcessProgram(p.Children, seq+1, bindName(bound, message), err)
 					proc = append(proc, &Proc{subscribeType, channel, message, children})
 				}
 			}
@@ -118,7 +124,7 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 
 				if len(p.L[0]) == 0 {
 					// Create temporary message channel.
-					message := Var{false, seq}
+					message := Var{false, seq, "<tmp>"}
 					proc = append(proc, &Proc{PINewRef, message, Var{}, []*Proc{
 						&Proc{PISend, channel, message, []*Proc{
 							&Proc{PIPopRef, message, Var{}, children},
@@ -140,7 +146,7 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 func resolveName(name string, bound map[string]uint, err *errorList) Var {
 	// Check if the name is bound.
 	if index, in := bound[name]; in {
-		return Var{false, index}
+		return Var{false, index, name}
 	}
 	// Hexadecimal stdin/stdout
 	offset := uint(0)
@@ -151,7 +157,7 @@ func resolveName(name string, bound map[string]uint, err *errorList) Var {
 	}
 	if len(m) != 0 {
 		v, _ := hex.DecodeString(m[1])
-		return Var{true, offset + uint(v[0])}
+		return Var{true, offset + uint(v[0]), name}
 	}
 	// Alphanumeric stdin/stdout
 	offset = 0
@@ -162,21 +168,23 @@ func resolveName(name string, bound map[string]uint, err *errorList) Var {
 	}
 	if len(m) != 0 {
 		b := byte(m[1][0])
-		return Var{true, offset + uint(b)}
+		return Var{true, offset + uint(b), name}
 	}
-	// Control channels
-	if name == stdinReadName {
-		return Var{true, stdinReadID}
+	// Other special channels
+	for k, id := range specialChannels {
+		if name == k {
+			return Var{true, id, name}
+		}
 	}
 	err.Add(fmt.Errorf("unbound variable \"%v\"", name))
 	// Note that Var{true, 0} is always valid.
-	return Var{true, 0}
+	return Var{true, 0, name}
 }
 
 // Copy all bound variables and add a new variable.
-func bindName(bound map[string]uint, name string, v Var) map[string]uint {
+func bindName(bound map[string]uint, v Var) map[string]uint {
 	copy := copyMap(bound)
-	copy[name] = v.Value
+	copy[v.Name] = v.Value
 	return copy
 }
 

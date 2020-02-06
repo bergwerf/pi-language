@@ -61,6 +61,9 @@
   +c; c->forward; stdin__y->c; stdout__Y->c; ready->c.
   +c; c->forward; stdin__z->c; stdout__Z->c; ready->c.
 
+  -- Add a newline after the input.
+  <-stdin_EOF; ->stdout_0A.
+
   -- Wait until all 26 + 26 forwards are ready.
   x<-ready; x<-ready; x<-ready; x<-ready; x<-ready;
   x<-ready; x<-ready; x<-ready; x<-ready; x<-ready;
