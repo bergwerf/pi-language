@@ -37,10 +37,9 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 		for len(stack1) > 0 {
 			node, stack1 = popStack(stack1)
 
-			if node.Proc.Type == PIReceiveOne || node.Proc.Type == PIReceiveAll {
+			if node.Proc.Type == PISubsOne || node.Proc.Type == PISubsAll {
 				// Move node to subscription map.
-				assert(len(node.Refs) == int(node.Proc.Y.Value))
-				channel := node.Proc.X.ID(node)
+				channel := node.Proc.Channel.ID(node)
 				addSub(sub, channel, node)
 			} else {
 				// Move node to secondary stack.
@@ -52,18 +51,25 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 		if len(stack2) > 0 {
 			node, stack2 = popStack(stack2)
 
-			if node.Proc.Type == PIAllocate {
-				// Allocate new channel ID and push child nodes on the primary stack.
-				assert(len(node.Refs) == int(node.Proc.X.Value))
+			if node.Proc.Type == PINewRef {
+				// Push new channel reference.
+				assert(len(node.Refs) == int(node.Proc.Channel.Value))
 				allocSequence++
 				refs := append(node.Refs, allocSequence)
 				for _, p := range node.Proc.Children {
 					stack1 = append(stack1, Node{p, refs})
 				}
+			} else if node.Proc.Type == PIPopRef {
+				// Pop channel reference.
+				assert(len(node.Refs) == 1+int(node.Proc.Channel.Value))
+				refs := node.Refs[:len(node.Refs)-1]
+				for _, p := range node.Proc.Children {
+					stack1 = append(stack1, Node{p, refs})
+				}
 			} else if node.Proc.Type == PISend {
 				// Get target channel and message channel.
-				channel := node.Proc.X.ID(node)
-				message := node.Proc.Y.ID(node)
+				channel := node.Proc.Channel.ID(node)
+				message := node.Proc.Message.ID(node)
 
 				// Check if this is an interface channel.
 				if channel == stdinReadID {
@@ -72,7 +78,7 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 						// Push a byte channel send to the secondary stack.
 						target := Var{true, uint(b)}
 						carrier := Var{true, message}
-						trigger := &Proc{PISend, target, carrier, nil, nil}
+						trigger := &Proc{PISend, target, carrier, nil}
 						stack2 = append(stack2, Node{trigger, nil})
 					}
 				} else if stdoutIDOffset <= channel && channel < stdinReadID {
@@ -85,8 +91,8 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 				if subs, nonEmpty := sub[channel]; nonEmpty {
 					for n := subs.Front(); n != nil; n = n.Next() {
 						node := n.Value.(Node)
-						assert(node.Proc.X.ID(node) == channel)
-						assert(len(node.Refs) == int(node.Proc.Y.Value))
+						assert(node.Proc.Channel.ID(node) == channel)
+						assert(len(node.Refs) == int(node.Proc.Message.Value))
 
 						// Add message to node references and push children on the stack.
 						refs := append(node.Refs, message)
@@ -94,8 +100,8 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 							stack1 = append(stack1, Node{p, refs})
 						}
 
-						// Remove PIReceiveOne subscription.
-						if node.Proc.Type == PIReceiveOne {
+						// Remove PISubsOne subscription.
+						if node.Proc.Type == PISubsOne {
 							subs.Remove(n)
 						}
 					}

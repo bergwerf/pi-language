@@ -2,14 +2,6 @@ package main
 
 import "container/list"
 
-// Prepend the hd error to the tl errors if it is not nil.
-func mergeErr(hd error, tl []error) []error {
-	if hd != nil {
-		return append([]error{hd}, tl...)
-	}
-	return tl
-}
-
 // Create a deep copy of a string to uint map.
 func copyMap(m map[string]uint) map[string]uint {
 	n := make(map[string]uint, len(m))
@@ -17,6 +9,14 @@ func copyMap(m map[string]uint) map[string]uint {
 		n[k] = v
 	}
 	return n
+}
+
+// Ternary operator replacement for choosing an integer.
+func pick(takeX bool, x int, y int) int {
+	if takeX {
+		return x
+	}
+	return y
 }
 
 // ListUnion merges the second list into the first list while retaining order.

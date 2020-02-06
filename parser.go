@@ -7,7 +7,7 @@ import (
 )
 
 // Allowed variable name pattern.
-var nameRe, _ = regexp.Compile("^[a-zA-Z0-9_]+$")
+var nameRe, _ = regexp.Compile("^[a-zA-Z0-9_]*$")
 
 // Tokens
 const (
@@ -25,22 +25,22 @@ const (
 
 // AST nodes
 const (
-	PIAllocate = iota
-	PIReceiveOne
-	PIReceiveAll
-	PISend
+	ASTCreate = iota
+	ASTReceiveOne
+	ASTReceiveAll
+	ASTSend
 )
 
 // A token
 type tok struct {
-	t    int
-	name string
+	t       int
+	content string
 }
 
 // Process is the primary AST node for PI programs.
 type Process struct {
 	Type     int        // Node type
-	X, Y     string     // Variable names
+	L, R     []string   // Variable names
 	Children []*Process // Child processes
 }
 
@@ -79,10 +79,10 @@ func parse(tokens []tok, index int) ([]*Process, int, []error) {
 	switch tokens[index].t {
 	// Plus: channel creation.
 	case Plus:
-		name, err1 := checkVariableToken(tokens[index+1])
+		names, err1 := splitVariable(tokens[index+1], false)
 		children, end, err2 := parse(tokens, index+2)
-		err := mergeErr(err1, err2)
-		return []*Process{&Process{PIAllocate, name, "", children}}, end, err
+		err := append(err1, err2...)
+		return []*Process{&Process{ASTCreate, nil, names, children}}, end, err
 
 	// Semicolon: return process after semi-colon.
 	case Semicolon:
@@ -94,18 +94,18 @@ func parse(tokens []tok, index int) ([]*Process, int, []error) {
 
 	// Variable: expect a bind, receive or send.
 	case Variable:
-		y, err1 := checkVariableToken(tokens[index])
-		x, err2 := checkVariableToken(tokens[index+2])
-		children, end, err3 := parse(tokens, index+3)
-		err := mergeErr(err1, mergeErr(err2, err3))
+		l, err1 := splitVariable(tokens[index], true)
+		r, err2 := splitVariable(tokens[index+2], false)
+		c, end, err3 := parse(tokens, index+3)
+		err := append(append(err1, err2...), err3...)
 
 		switch tokens[index+1].t {
 		case ReceiveOneSymbol:
-			return []*Process{&Process{PIReceiveOne, x, y, children}}, end, err
+			return []*Process{&Process{ASTReceiveOne, l, r, c}}, end, err
 		case ReceiveAllSymbol:
-			return []*Process{&Process{PIReceiveAll, x, y, children}}, end, err
+			return []*Process{&Process{ASTReceiveAll, l, r, c}}, end, err
 		case SendSymbol:
-			return []*Process{&Process{PISend, x, y, children}}, end, err
+			return []*Process{&Process{ASTSend, l, r, c}}, end, err
 		default:
 			return nil, index, []error{fmt.Errorf("unexpected token")}
 		}
@@ -132,17 +132,28 @@ func parse(tokens []tok, index int) ([]*Process, int, []error) {
 	}
 }
 
-// Check if the given token is a valid variable token.
-func checkVariableToken(variable tok) (string, error) {
+// Extract a list of valid names from the given token and return it. To make
+// splitting easier the comma is not parsed as a separate token by tokenize.
+func splitVariable(variable tok, allowEmpty bool) ([]string, []error) {
 	if variable.t != Variable {
-		return "", fmt.Errorf("expected variable token")
+		return nil, []error{fmt.Errorf("expected variable token")}
 	}
-	name := variable.name
-	if !nameRe.MatchString(name) {
-		err := fmt.Errorf("name \"%v\" does not match %v", name, nameRe.String())
-		return name, err
+	names := strings.Split(variable.content, ",")
+	valid := make([]string, 0, len(names))
+	errors := make([]error, 0)
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if !allowEmpty && len(name) == 0 {
+			err := fmt.Errorf("illegal empty name")
+			errors = append(errors, err)
+		} else if !nameRe.MatchString(name) {
+			err := fmt.Errorf("name \"%v\" does not match %v", name, nameRe.String())
+			errors = append(errors, err)
+		} else {
+			valid = append(valid, name)
+		}
 	}
-	return name, nil
+	return valid, errors
 }
 
 // Extract source tokens and remove whitespace and comments. Illegal variable

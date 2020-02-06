@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/list"
 	"encoding/hex"
 	"fmt"
 	"regexp"
@@ -23,6 +22,18 @@ var (
 	reservedLength = uint(513)
 )
 
+// Proc types
+//
+// These are named a bit different from Process types to better describe what
+// the process does in the simulation rather than what action it describes.
+const (
+	PINewRef = iota
+	PIPopRef
+	PISubsOne
+	PISubsAll
+	PISend
+)
+
 // Var represents a variable.
 type Var struct {
 	Raw   bool // Raw variable ID (for interface channels)
@@ -41,73 +52,95 @@ func (v Var) ID(node Node) uint {
 // Process but contains additional information.
 type Proc struct {
 	Type     int
-	X, Y     Var     // X and Y variables
+	Channel  Var     // Variable for allocated and receive/send channel
+	Message  Var     // Variable for receive/send message
 	Children []*Proc // Child processes (parallel)
-	Scope    []uint  // Allocated variables (by index) that are in use
 }
 
-// ProcessProgram processes a parsed program. It replaces variable names with
-// scope indices, and returns the variables that are in use (this may be used
-// in the future to clean up running processes).
-func ProcessProgram(program []*Process, seq uint, bound map[string]uint) (
-	[]*Proc, *list.List, []error) {
-	proc := make([]*Proc, len(program))
-	fullScope := list.New()
-	errors := make([]error, 0)
+// ProcessProgram converts a parsed AST into a program in the core format (this
+// includes some desugaring).
+func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *errorList) []*Proc {
+	proc := make([]*Proc, 0, len(program))
+	for _, p := range program {
+		// Unroll argument lists.
+		if len(p.L) > 1 || len(p.R) > 1 {
+			l1, l2, r1, r2 := p.L, p.L, p.R, p.R
+			if len(p.L) > 1 {
+				l1, l2 = p.L[0:1], p.L[1:]
+			} else {
+				r1, r2 = p.R[0:1], p.R[1:]
+			}
 
-	for i, p := range program {
+			pIn := &Process{p.Type, l1, r1, []*Process{&Process{p.Type, l2, r2, p.Children}}}
+			pOut := ProcessProgram([]*Process{pIn}, seq, bound, err)
+
+			assert(len(pOut) == 1)
+			proc = append(proc, pOut[0])
+			continue
+		}
+
+		// Require a right argument for all process types.
+		if len(p.R) != 1 {
+			continue
+		}
+
 		switch p.Type {
-		case PIAllocate:
-			// Bind X to next variable index.
-			bindX := copyMap(bound)
-			bindX[p.X] = seq
+		case ASTCreate:
+			created := Var{false, seq}
+			children := ProcessProgram(p.Children, seq+1, bindName(bound, p.R[0], created), err)
+			proc = append(proc, &Proc{PINewRef, created, Var{}, children})
 
-			c, scope, err := ProcessProgram(p.Children, seq+1, bindX)
-
-			proc[i] = &Proc{PIAllocate, Var{false, seq}, Var{}, c, toSlice(scope)}
-			ListUnion(fullScope, scope)
-			errors = append(errors, err...)
-
-		case PIReceiveOne:
+		case ASTReceiveOne:
 			fallthrough
-		case PIReceiveAll:
-			// Bind Y to next variable index.
-			x, xD, err1 := resolveName(p.X, bound)
-			bindY := copyMap(bound)
-			bindY[p.Y] = seq
+		case ASTReceiveAll:
+			subscribeType := pick(p.Type == ASTReceiveOne, PISubsOne, PISubsAll)
+			if len(p.L) == 1 {
+				channel := resolveName(p.R[0], bound, err)
+				message := Var{false, seq}
 
-			c, scope, err2 := ProcessProgram(p.Children, seq+1, bindY)
-			ListUnion(scope, xD)
+				if len(p.L[0]) == 0 {
+					// Pop message right after receiving it.
+					children := ProcessProgram(p.Children, seq, bound, err)
+					proc = append(proc, &Proc{subscribeType, channel, message, []*Proc{
+						&Proc{PIPopRef, message, Var{}, children},
+					}})
+				} else {
+					// Bind message to the next reference index.
+					children := ProcessProgram(p.Children, seq+1, bindName(bound, p.L[0], message), err)
+					proc = append(proc, &Proc{subscribeType, channel, message, children})
+				}
+			}
 
-			proc[i] = &Proc{p.Type, x, Var{false, seq}, c, toSlice(scope)}
-			ListUnion(fullScope, scope)
-			errors = append(errors, mergeErr(err1, err2)...)
+		case ASTSend:
+			if len(p.L) == 1 {
+				channel := resolveName(p.R[0], bound, err)
+				children := ProcessProgram(p.Children, seq, bound, err)
 
-		case PISend:
-			// Resolve both variables.
-			x, xD, err1 := resolveName(p.X, bound)
-			y, yD, err2 := resolveName(p.Y, bound)
-
-			c, scope, err3 := ProcessProgram(p.Children, seq, bound)
-			ListUnion(scope, xD)
-			ListUnion(scope, yD)
-
-			proc[i] = &Proc{PISend, x, y, c, toSlice(scope)}
-			ListUnion(fullScope, scope)
-			errors = append(errors, mergeErr(err1, mergeErr(err2, err3))...)
+				if len(p.L[0]) == 0 {
+					// Create temporary message channel.
+					message := Var{false, seq}
+					proc = append(proc, &Proc{PINewRef, message, Var{}, []*Proc{
+						&Proc{PISend, channel, message, []*Proc{
+							&Proc{PIPopRef, message, Var{}, children},
+						}},
+					}})
+				} else {
+					// Lookup message in bound variables.
+					message := resolveName(p.L[0], bound, err)
+					proc = append(proc, &Proc{PISend, channel, message, children})
+				}
+			}
 		}
 	}
 
-	return proc, fullScope, errors
+	return proc
 }
 
 // Check if a name is bound or if it is an interface channel.
-func resolveName(name string, bound map[string]uint) (Var, *list.List, error) {
+func resolveName(name string, bound map[string]uint, err *errorList) Var {
 	// Check if the name is bound.
 	if index, in := bound[name]; in {
-		localScope := list.New()
-		localScope.PushBack(index)
-		return Var{false, index}, localScope, nil
+		return Var{false, index}
 	}
 	// Hexadecimal stdin/stdout
 	offset := uint(0)
@@ -118,7 +151,7 @@ func resolveName(name string, bound map[string]uint) (Var, *list.List, error) {
 	}
 	if len(m) != 0 {
 		v, _ := hex.DecodeString(m[1])
-		return Var{true, offset + uint(v[0])}, list.New(), nil
+		return Var{true, offset + uint(v[0])}
 	}
 	// Alphanumeric stdin/stdout
 	offset = 0
@@ -129,12 +162,29 @@ func resolveName(name string, bound map[string]uint) (Var, *list.List, error) {
 	}
 	if len(m) != 0 {
 		b := byte(m[1][0])
-		return Var{true, offset + uint(b)}, list.New(), nil
+		return Var{true, offset + uint(b)}
 	}
 	// Control channels
 	if name == stdinReadName {
-		return Var{true, stdinReadID}, list.New(), nil
+		return Var{true, stdinReadID}
 	}
+	err.Add(fmt.Errorf("unbound variable \"%v\"", name))
 	// Note that Var{true, 0} is always valid.
-	return Var{true, 0}, list.New(), fmt.Errorf("unbound variable \"%v\"", name)
+	return Var{true, 0}
+}
+
+// Copy all bound variables and add a new variable.
+func bindName(bound map[string]uint, name string, v Var) map[string]uint {
+	copy := copyMap(bound)
+	copy[name] = v.Value
+	return copy
+}
+
+// Keep track of errors using this error list.
+type errorList []error
+
+func (l *errorList) Add(err error) {
+	if err != nil {
+		*l = append(*l, err)
+	}
 }

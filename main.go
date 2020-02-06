@@ -39,7 +39,8 @@ func main() {
 	}
 
 	// Process program.
-	proc, _, err := ProcessProgram(program, uint(0), nil)
+	err := errorList([]error{})
+	proc := ProcessProgram(program, uint(0), nil, &err)
 	if len(err) != 0 {
 		for _, e := range err {
 			println(e.Error())

@@ -65,21 +65,10 @@ after `--` until the next newline is ignored) and some pre-processing:
 - `#global: .*\n` declares a global channel.
 - `#attach: .*\n` imports all processes and global names from the given file.
 
-Syntax shortcuts
-----------------
-I considered introducing some syntactic sugar or a way to define macros (for
-example to send multiple channels to a function, or to send an new channel that
-is only used as trigger), but I decided this goes against the initial goals of
-keeping extreme minimalism and building a self-hosted compiler.
-
 Garbage collection
 ------------------
 Ideas for garbage collection (memory optimization):
 + Collect channels if all existing sender processes have finished.
 + Collect processes if the trigger channel is cleaned up (this may included
   replicated processes).
-
-Self hosting interpreter
-------------------------
-Currently my goal is to program an interpreter for PI in PI. I don't know yet if
-this is feasible.
+  
