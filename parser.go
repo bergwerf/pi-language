@@ -9,6 +9,9 @@ import (
 // Allowed variable name pattern.
 var nameRe, _ = regexp.Compile("^[a-zA-Z0-9_]*$")
 
+// Directive pattern.
+var directiveRe, _ = regexp.Compile("^#(.+):(.+?)(?:--|$)")
+
 // Tokens
 const (
 	Plus = iota
@@ -52,7 +55,8 @@ func Parse(source string) ([]*Process, []error) {
 	open, close, eof := tok{ParOpen, ""}, tok{ParClose, ""}, tok{EOFMark, ""}
 	tokens1 := tokenize(source)
 	tokens2 := append(append([]tok{open}, tokens1...), close, eof)
-	proc, index, err := parse(tokens2, 0)
+	err := errorList([]error{})
+	proc, index := parse(tokens2, 0, &err)
 
 	// Check that we finished at the EOF.
 	if index+1 != len(tokens2) {
@@ -68,92 +72,94 @@ func Parse(source string) ([]*Process, []error) {
 // Slightly more variations than the formal grammar are allowed: receive and
 // bind statements without subsequent process, no Semicolon before a ParOpen,
 // duplicate Semicolon or Period.
-func parse(tokens []tok, index int) ([]*Process, int, []error) {
+func parse(tokens []tok, index int, err *errorList) ([]*Process, int) {
 	// Check bounds. Note that we always end with ParClose and EOF. The ParOpen
 	// case already generates an error for this case, we only move the index to
 	// the EOF token.
 	if index+2 >= len(tokens) {
-		return nil, len(tokens) - 1, nil
+		return nil, len(tokens) - 1
 	}
 
 	switch tokens[index].t {
 	// Plus: channel creation.
 	case Plus:
-		names, err1 := splitVariable(tokens[index+1], false)
-		children, end, err2 := parse(tokens, index+2)
-		err := append(err1, err2...)
-		return []*Process{&Process{ASTCreate, nil, names, children}}, end, err
+		names := splitVariable(tokens[index+1], false, err)
+		children, end := parse(tokens, index+2, err)
+		return []*Process{&Process{ASTCreate, nil, names, children}}, end
 
 	// Semicolon: return process after semi-colon.
 	case Semicolon:
-		return parse(tokens, index+1)
+		return parse(tokens, index+1, err)
 
 	// Period: return empty process list.
 	case Period:
-		return nil, index + 1, nil
+		return nil, index + 1
 
 	// Variable: expect a bind, receive or send.
 	case Variable:
-		l, err1 := splitVariable(tokens[index], true)
-		r, err2 := splitVariable(tokens[index+2], false)
-		c, end, err3 := parse(tokens, index+3)
-		err := append(append(err1, err2...), err3...)
+		l := splitVariable(tokens[index], true, err)
+		r := splitVariable(tokens[index+2], false, err)
+		c, end := parse(tokens, index+3, err)
 
 		switch tokens[index+1].t {
 		case ReceiveOneSymbol:
-			return []*Process{&Process{ASTReceiveOne, l, r, c}}, end, err
+			return []*Process{&Process{ASTReceiveOne, l, r, c}}, end
 		case ReceiveAllSymbol:
-			return []*Process{&Process{ASTReceiveAll, l, r, c}}, end, err
+			return []*Process{&Process{ASTReceiveAll, l, r, c}}, end
 		case SendSymbol:
-			return []*Process{&Process{ASTSend, l, r, c}}, end, err
+			return []*Process{&Process{ASTSend, l, r, c}}, end
 		default:
-			return nil, index, []error{fmt.Errorf("unexpected token")}
+			err.Add(fmt.Errorf("unexpected token"))
+			return nil, index
 		}
 
 	// ParOpen: aggregate all processes until the first ParClose.
 	case ParOpen:
 		index++
 		all := make([]*Process, 0)
-		err := make([]error, 0)
 		for tokens[index].t != ParClose {
-			children, index1, err1 := parse(tokens, index)
-			index = index1 // Golang would otherwise shadow index.
+			children, newIndex := parse(tokens, index, err)
 			all = append(all, children...)
-			err = append(err, err1...)
+
+			// If the index did not move forward we got stuck (by a syntax error). We
+			// could quit parsing right now, but instead we try if we can pick up a
+			// valid trail again by skipping the current token (quicker debugging).
+			index = pick(newIndex == index, newIndex+1, newIndex)
+
 			// Check if a closing parenthesis was missing or we ran out of tokens.
 			if tokens[index].t == EOFMark {
-				return all, index, append(err, fmt.Errorf("unexpected EOF"))
+				err.Add(fmt.Errorf("unexpected EOF"))
+				return all, index
 			}
 		}
-		return all, index + 1, err
+		return all, index + 1
 
 	default:
-		return nil, index, []error{fmt.Errorf("unexpected token")}
+		err.Add(fmt.Errorf("unexpected token"))
+		return nil, index
 	}
 }
 
 // Extract a list of valid names from the given token and return it. To make
 // splitting easier the comma is not parsed as a separate token by tokenize.
-func splitVariable(variable tok, allowEmpty bool) ([]string, []error) {
+func splitVariable(variable tok, allowEmpty bool, err *errorList) []string {
 	if variable.t != Variable {
-		return nil, []error{fmt.Errorf("expected variable token")}
+		err.Add(fmt.Errorf("expected variable token"))
+		return nil
 	}
 	names := strings.Split(variable.content, ",")
 	valid := make([]string, 0, len(names))
-	errors := make([]error, 0)
 	for _, name := range names {
 		name = strings.TrimSpace(name)
 		if !allowEmpty && len(name) == 0 {
-			err := fmt.Errorf("illegal empty name")
-			errors = append(errors, err)
+			err.Add(fmt.Errorf("illegal empty name"))
 		} else if !nameRe.MatchString(name) {
-			err := fmt.Errorf("name \"%v\" does not match %v", name, nameRe.String())
-			errors = append(errors, err)
+			err.Add(fmt.Errorf("name \"%v\" does not match %v", name, nameRe.String()))
 		} else {
 			valid = append(valid, name)
 		}
 	}
-	return valid, errors
+	return valid
 }
 
 // Extract source tokens and remove whitespace and comments. Illegal variable
@@ -184,6 +190,10 @@ func tokenize(source string) []tok {
 		case ')':
 			tokens = append(tokens, tok{ParClose, ""})
 		default:
+			if len(source) <= i+2 {
+				acc += string(c)
+				continue
+			}
 			switch source[i : i+2] {
 			case "--":
 				comment = true
@@ -205,4 +215,33 @@ func tokenize(source string) []tok {
 		}
 	}
 	return tokens
+}
+
+// ExtractDirectives removes directives appearing at the beginning of the given
+// source and returns them as a map with the remaining code. Directives can only
+// occur before any PI script and do not depend on each other. Comments and
+// empty lines are allowed between directives.
+func ExtractDirectives(source string) ([]string, []string, string) {
+	lines := strings.Split(source, "\n")
+	attach, global := make([]string, 0), make([]string, 0)
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+		m := directiveRe.FindStringSubmatch(line)
+		if len(m) > 0 {
+			key, value := m[1], strings.TrimSpace(m[2])
+			switch key {
+			case "attach":
+				attach = append(attach, value)
+			case "global":
+				global = append(global, value)
+			}
+		} else if len(line) == 0 || strings.HasPrefix(line, "--") {
+			// Skip empty lines or comments.
+			continue
+		} else {
+			// End of directives; return result.
+			return attach, global, strings.Join(lines[i:], "\n")
+		}
+	}
+	return attach, global, ""
 }

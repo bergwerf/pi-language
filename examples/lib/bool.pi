@@ -1,0 +1,23 @@
+#global: tt
+#global: ff
+#global: switch
+
+c<<tt; t,f<-c; ->t.
+c<<ff; t,f<-c; ->f.
+
+c<<switch;
+  +set_tt,set_ff,value,_val,get_tt,get_ff,ready;
+  set_tt,set_ff,value,ready->c;(
+    ->get_tt;->ready.
+    <<get_tt; c<-_val; keep,t,f<-c; ->t; +do;(
+      do->keep;->keep.
+      <-do;->get_tt.
+    )
+    <<get_ff; c<-_val; keep,t,f<-c; ->f; +do;(
+      do->keep;->keep.
+      <-do;->get_ff.
+    )
+    ready<<set_tt; +c;c->_val; ff,,->c; ->get_tt;->ready.
+    ready<<set_ff; +c;c->_val; ff,,->c; ->get_ff;->ready.
+    c<<value; t,f<-c; +cc;cc->_val; tt,t,f->cc.
+  )

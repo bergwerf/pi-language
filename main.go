@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,28 +15,57 @@ func main() {
 
 	// Parse all files given by the command line arguments.
 	program := make([]*Process, 0)
-	for _, name := range os.Args[1:] {
+	stack := make([]string, 0) // File reading stack
+	global := MakeSet()        // Global names
+	loaded := MakeSet()        // Already parsed files
+
+	for _, arg := range os.Args[1:] {
 		// An --stdin flag is supported for debugging.
-		if strings.HasPrefix(name, "--stdin=") {
-			stdin = strings.NewReader(name[8:])
+		if strings.HasPrefix(arg, "--stdin=") {
+			stdin = strings.NewReader(arg[8:])
+		} else {
+			stack = append(stack, arg)
+		}
+	}
+
+	for len(stack) > 0 {
+		var path string
+		path, stack = stack[len(stack)-1], stack[:len(stack)-1]
+		if loaded.Contains(path) {
 			continue
 		}
+		loaded.Add(path)
 
-		// Try to read.
-		bytes, ioErr := ioutil.ReadFile(name)
+		// Try to read file.
+		bytes, ioErr := ioutil.ReadFile(path)
 		if ioErr != nil {
 			panic(ioErr)
 		}
 
+		// Extract directives.
+		attachAdd, globalAdd, source := ExtractDirectives(string(bytes))
+		global.AddAll(globalAdd)
+
+		// Add attached files relative to this file.
+		for _, attachment := range attachAdd {
+			abs := filepath.Join(filepath.Dir(path), attachment)
+			stack = append(stack, abs)
+		}
+
 		// Try to parse.
-		proc, parseErr := Parse(string(bytes))
+		proc, parseErr := Parse(source)
 		program = append(program, proc...)
 		if len(parseErr) != 0 {
 			for _, e := range parseErr {
 				println(e.Error())
 			}
-			panic(fmt.Sprintf("Terminated because \"%v\" contains errors.", name))
+			panic(fmt.Sprintf("Terminated because \"%v\" contains errors.", path))
 		}
+	}
+
+	// Wrap all processes in globally defined names.
+	if len(global) > 0 {
+		program = []*Process{&Process{ASTCreate, nil, global.ToSlice(), program}}
 	}
 
 	// Process program.
@@ -45,8 +75,8 @@ func main() {
 		for _, e := range err {
 			println(e.Error())
 		}
+	} else {
+		// Simulate program.
+		Simulate(proc, stdin, os.Stdout)
 	}
-
-	// Simulate program.
-	Simulate(proc, stdin, os.Stdout)
 }

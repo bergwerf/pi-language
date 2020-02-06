@@ -47,9 +47,59 @@ func toSlice(l *list.List) []uint {
 	return output
 }
 
+// Copy-append to uint slice.
+func copyAppend(a []uint, b uint) []uint {
+	c := make([]uint, len(a)+1)
+	copy(c, a)
+	c[len(c)-1] = b
+	return c
+}
+
 // Assertion shortcut
 func assert(condition bool) {
 	if !condition {
 		panic("failed assertion")
 	}
+}
+
+// Set is a hash set using a map.
+type Set map[string]bool
+
+// MakeSet makes a new Set.
+func MakeSet() Set {
+	return Set(map[string]bool{})
+}
+
+// Add element.
+func (s Set) Add(k string) {
+	s[k] = true
+}
+
+// Remove element.
+func (s Set) Remove(k string) {
+	delete(s, k)
+}
+
+// AddAll elements.
+func (s Set) AddAll(a []string) {
+	for _, k := range a {
+		s.Add(k)
+	}
+}
+
+// Contains element.
+func (s Set) Contains(k string) bool {
+	if _, in := s[k]; in {
+		return true
+	}
+	return false
+}
+
+// ToSlice returns a slice of elements.
+func (s Set) ToSlice() []string {
+	elements := make([]string, 0, len(s))
+	for k := range s {
+		elements = append(elements, k)
+	}
+	return elements
 }

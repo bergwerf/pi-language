@@ -1,16 +1,5 @@
 -- Print "Hello, World!\n" and exit.
-+x;
-x->stdout__H;
-x->stdout__e;
-x->stdout__l;
-x->stdout__l;
-x->stdout__o;
-x->stdout_2C; -- ,
-x->stdout_20; -- <space>
-x->stdout__W;
-x->stdout__o;
-x->stdout__r;
-x->stdout__l;
-x->stdout__d;
-x->stdout_21; -- !
-x->stdout_0A. -- \n
+->stdout__H,stdout__e,stdout__l,stdout__l,stdout__o;
+->stdout_2C,stdout_20; -- ,<space>
+->stdout__W,stdout__o,stdout__r,stdout__l,stdout__d;
+->stdout_21,stdout_0A. -- !\n

@@ -13,7 +13,8 @@
         ],
         "extensions": [
           ".pi"
-        ]
+        ],
+        "configuration": "./pi-config.json"
       }
     ],
     "grammars": [

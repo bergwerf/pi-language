@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"container/list"
 	"io"
 )
@@ -15,8 +14,6 @@ type Node struct {
 
 // Simulate the given pre-processed program.
 func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
-	bufin := bufio.NewReader(input)
-
 	// Global channel identifier sequence.
 	allocSequence := reservedLength
 
@@ -55,7 +52,7 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 				// Push new channel reference.
 				assert(len(node.Refs) == int(node.Proc.Channel.Value))
 				allocSequence++
-				refs := append(node.Refs, allocSequence)
+				refs := copyAppend(node.Refs, allocSequence)
 				for _, p := range node.Proc.Children {
 					stack1 = append(stack1, Node{p, refs})
 				}
@@ -73,10 +70,11 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 
 				// Check if this is an interface channel.
 				if channel == stdinReadID {
-					// Try to read next byte.
-					if b, err := bufin.ReadByte(); err == nil {
+					// Wait for next byte (or EOF)
+					buf := make([]byte, 1)
+					if _, err := input.Read(buf); err == nil {
 						// Push a byte channel send to the secondary stack.
-						target := Var{true, uint(b)}
+						target := Var{true, uint(buf[0])}
 						carrier := Var{true, message}
 						trigger := &Proc{PISend, target, carrier, nil}
 						stack2 = append(stack2, Node{trigger, nil})
@@ -95,7 +93,7 @@ func Simulate(proc []*Proc, input io.Reader, output io.Writer) {
 						assert(len(node.Refs) == int(node.Proc.Message.Value))
 
 						// Add message to node references and push children on the stack.
-						refs := append(node.Refs, message)
+						refs := copyAppend(node.Refs, message)
 						for _, p := range node.Proc.Children {
 							stack1 = append(stack1, Node{p, refs})
 						}

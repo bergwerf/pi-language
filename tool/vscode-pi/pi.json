@@ -1,6 +1,8 @@
 {
   "scopeName": "source.pi",
   "name": "PI",
+  "foldingStartMarker": "\\(",
+  "foldingStopMarker": "\\)",
   "fileTypes": [
     "pi"
   ],

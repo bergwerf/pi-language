@@ -13,27 +13,12 @@ added to the basic Pi calculus.
 
 Hello, World!
 -------------
-This demonstrates the use of unicode channels to print "Hello, World!". The
-Unicode channels enable a PI program to read and write all Unicode characters.
-I view PI programs with font ligatures for arrows (I use FiraCode).
-
 ```
 -- Print "Hello, World!\n" and exit.
-+x;
-x->stdout__H;
-x->stdout__e;
-x->stdout__l;
-x->stdout__l;
-x->stdout__o;
-x->stdout_2C; -- ,
-x->stdout_20; -- <space>
-x->stdout__W;
-x->stdout__o;
-x->stdout__r;
-x->stdout__l;
-x->stdout__d;
-x->stdout_21; -- !
-x->stdout_0A. -- \n
+->stdout__H,stdout__e,stdout__l,stdout__l,stdout__o;
+->stdout_2C,stdout_20; -- ,<space>
+->stdout__W,stdout__o,stdout__r,stdout__l,stdout__d;
+->stdout_21,stdout_0A. -- !\n
 ```
 
 Grammar
@@ -51,6 +36,7 @@ data types. The interface channels are:
 - `stdin_[0-9A-F]{2}` triggers when a specific byte is read.
 - `stdout_[0-9A-F]{2}` writes bytes to the standard output when triggered.
 - `stdin__[a-zA-Z0-9]` and `stdout__[a-zA-Z0-9]` are aliases.
+- `stdin_eof` triggers when EOF is reached.
 
 I replaced the replication operator with a subscribe operator which will respawn
 the subsequent process whenever a new element is received on the subscribed
