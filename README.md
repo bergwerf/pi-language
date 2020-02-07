@@ -21,7 +21,7 @@ Hello, World!
 
 Grammar
 -------
-The PI language has the following grammar:
+The PI core language has the following grammar:
 
 ```
 P,Q ::= +x;P | y<-x;P | y<<x;P | y->x;P | y->x. | PQ | (P)
@@ -43,16 +43,48 @@ channel. I believe this is more practical and easier to define. To prove that
 Turing completeness is retained one could try to program a beta reduction
 algorithm for the Lambda calculus in PI.
 
-Extensions
-----------
-To make this language more practical there is support for comments (all text
-after `--` until the next newline is ignored) and some pre-processing:
-- `#global: .*\n` declares a global channel.
-- `#attach: .*\n` imports all processes and global names from the given file.
+### Extensions
+A supported syntactic sugar is the ability to use multiple arguments at once:
+`x,y->v,w` is desugared to `x->v;x->w;y->v;y->w`. You can write line comments
+after a `!` (inspired by Fortran, I believe the exclamation mark is perfect for
+attracting the readers attention, as if the author is screaming at you to please
+understand what is going on). To make working with multiple files more practical
+there are two pre-processing directives:
+- `#global: name` declares `name` to be a global channel.
+- `#attach: file.pi` instructs the interpreter to include the program in
+  `file.pi` and make its global channels available here.
 
-Garbage collection
-------------------
-Ideas for garbage collection (memory optimization):
-+ Collect channels if all existing sender processes have finished.
-+ Collect processes if the trigger channel is cleaned up (this may included
-  replicated processes).
+Semantics
+---------
+Here is a list of scenarios I considered to determine an appropriate simulation
+algorithm. This list is by no means complete, and I did not start from a formal
+semantics because I want to start from a practical perspective (and save time).
+In my simulation algorithm I try to allow future extensions for randomly
+dropping or delaying processes and messages.
+
+- `+x,y;x->y;z<-y.` Once a process sends it cannot receive what it sent later
+  on. Hence here z is not equal to x, instead the process waits for the next
+  message through y. It is guaranteed that z is always the message after x.
+- `+x,y;(x->y.z<-y.)` Parallel processes in the same block are started
+  simultaneously and can communicate with each other from the start. Thus here
+  z is equal to x. A stricter rule is that receiving processes (subscribers) are
+  started first such that they can always receive the first sent of any process
+  in parallel. Without this rule a lot of constructs become near impossible.
+- `x,y;(z<-y;v<-z.x->y;+v;v->x.)` When sending x to y the process cannot expect
+  that the other process receives it right away. To make sure that the other
+  process can receive v through x it has to wait for an acknowledgement.
+
+Note: theoretical computer scientists may find it absurd I do not start from a
+type theory or formal operational semantics. However I regard this project as a
+puzzle for myself to discover what works and what doesn't. And I really do
+dread reading long documents.
+
+Using goroutines
+----------------
+An interesting exercise would be to make a PI interpreter that (ab)uses Go
+routines and channels. The program processor (before simulation) would have to
+determine when channels can be marked as dead (e.g. determine the information
+needed such that the simulator can perform reference counting) such that they
+can be closed (or else a multitude of open channels will accumulate). I am not
+sure if it is possible to create a channel that can send arbitary typed channels
+itself. Otherwise a central channel registry is needed.
