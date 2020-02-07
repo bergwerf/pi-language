@@ -1,5 +1,5 @@
--- Read T and F from the input and output the last state whenever an O appears.
--- Thus TFTOFTFO outputs TF.
+! Read T and F from the input and output the last state whenever an O appears.
+! Thus TFTOFTFO outputs TF.
 
 #attach: lib/bool.pi
 

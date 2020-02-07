@@ -1,11 +1,11 @@
--- Convert the input string to upper case.
+! Convert the input string to upper case.
 
 +forward;+ready;(
-  -- Forward all messages through in to out and trigger a byte read.
+  ! Forward all messages through in to out and trigger a byte read.
   args<<forward; in<-args; out<-args; ready<-args;(
     +x; x->ready. m<<in; m->out; m->stdin_read.)
 
-  -- Forward uppercase letters.
+  ! Forward uppercase letters.
   +c; c->forward; stdin__A->c; stdout__A->c; ready->c.
   +c; c->forward; stdin__B->c; stdout__B->c; ready->c.
   +c; c->forward; stdin__C->c; stdout__C->c; ready->c.
@@ -33,7 +33,7 @@
   +c; c->forward; stdin__Y->c; stdout__Y->c; ready->c.
   +c; c->forward; stdin__Z->c; stdout__Z->c; ready->c.
 
-  -- Convert lowercase input to uppercase output.
+  ! Convert lowercase input to uppercase output.
   +c; c->forward; stdin__a->c; stdout__A->c; ready->c.
   +c; c->forward; stdin__b->c; stdout__B->c; ready->c.
   +c; c->forward; stdin__c->c; stdout__C->c; ready->c.
@@ -61,10 +61,10 @@
   +c; c->forward; stdin__y->c; stdout__Y->c; ready->c.
   +c; c->forward; stdin__z->c; stdout__Z->c; ready->c.
 
-  -- Add a newline after the input.
+  ! Add a newline after the input.
   <-stdin_EOF; ->stdout_0A.
 
-  -- Wait until all 26 + 26 forwards are ready.
+  ! Wait until all 26 + 26 forwards are ready.
   x<-ready; x<-ready; x<-ready; x<-ready; x<-ready;
   x<-ready; x<-ready; x<-ready; x<-ready; x<-ready;
   x<-ready; x<-ready; x<-ready; x<-ready; x<-ready;

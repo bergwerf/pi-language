@@ -6,11 +6,14 @@ import (
 	"strings"
 )
 
-// Allowed variable name pattern.
-var nameRe, _ = regexp.Compile("^[a-zA-Z0-9_]*$")
+// Line comment flag.
+const lineComment = '!'
 
 // Directive pattern.
-var directiveRe, _ = regexp.Compile("^#(.+):(.+?)(?:--|$)")
+var directiveRe, _ = regexp.Compile("^#(.+):(.*)$")
+
+// Allowed variable name pattern.
+var nameRe, _ = regexp.Compile("^[a-zA-Z0-9_]*$")
 
 // Tokens
 const (
@@ -177,6 +180,8 @@ func tokenize(source string) []tok {
 		}
 		v := tok{Variable, strings.TrimSpace(acc)}
 		switch c {
+		case lineComment:
+			comment = true
 		case '+':
 			tokens = append(tokens, tok{Plus, ""})
 		case ';':
@@ -195,8 +200,6 @@ func tokenize(source string) []tok {
 				continue
 			}
 			switch source[i : i+2] {
-			case "--":
-				comment = true
 			case "<-":
 				tokens = append(tokens, v, tok{ReceiveOneSymbol, ""})
 				acc = ""
@@ -228,14 +231,15 @@ func ExtractDirectives(source string) ([]string, []string, string) {
 		line = strings.TrimSpace(line)
 		m := directiveRe.FindStringSubmatch(line)
 		if len(m) > 0 {
-			key, value := m[1], strings.TrimSpace(m[2])
-			switch key {
+			k := m[1]
+			v := strings.TrimSpace(strings.Split(m[2], string(lineComment))[0])
+			switch k {
 			case "attach":
-				attach = append(attach, value)
+				attach = append(attach, v)
 			case "global":
-				global = append(global, value)
+				global = append(global, v)
 			}
-		} else if len(line) == 0 || strings.HasPrefix(line, "--") {
+		} else if len(line) == 0 || line[0] == lineComment {
 			// Skip empty lines or comments.
 			continue
 		} else {

@@ -9,7 +9,7 @@
   "patterns": [
     {
       "name": "comment",
-      "begin": "--",
+      "begin": "!",
       "end": "$"
     },
     {

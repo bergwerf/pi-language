@@ -7,13 +7,13 @@
 #global: read_unary
 #global: write_unary
 
--- We attach a process to n that acts as a zero encoding; when a channel r is
--- sent to n, it will receive channel a (accumulator) and z (zero) over which
--- the number value is transmitted.
+! We attach a process to n that acts as a zero encoding; when a channel r is
+! sent to n, it will receive channel a (accumulator) and z (zero) over which
+! the number value is transmitted.
 n<<0;r<<n; +a,z; a,z->r; +x;x->z.
 n<<1;r<<n; +a,z; a,z->r; +x;x->a;x->z.
 
--- Addition of two encoded numbers.
+! Addition of two encoded numbers.
 xy<<add; x,y<-xy; +n;(
   n->xy.
   r<<n; +a,z; a,z->r; +r_x,r_y,z_xy;(
@@ -25,9 +25,9 @@ xy<<add; x,y<-xy; +n;(
   )
 )
 
--- Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
+! Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
 
--- Read unary number from stdin.
+! Read unary number from stdin.
 ret<<read_unary; read_ready<-ret;
   +c;c->stack; push,pop,ready<-c; <-ready;
   0->push; +n;(
@@ -41,7 +41,7 @@ ret<<read_unary; read_ready<-ret;
     )
   )
 
--- Write unary number to stdout.
+! Write unary number to stdout.
 n<<write_unary; +c;(
   c->n.
   a,z<-c;(

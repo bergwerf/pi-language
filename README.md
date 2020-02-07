@@ -14,11 +14,9 @@ added to the basic Pi calculus.
 Hello, World!
 -------------
 ```
--- Print "Hello, World!\n" and exit.
-->stdout__H,stdout__e,stdout__l,stdout__l,stdout__o;
-->stdout_2C,stdout_20; -- ,<space>
-->stdout__W,stdout__o,stdout__r,stdout__l,stdout__d;
-->stdout_21,stdout_0A. -- !\n
+! Print "Hello, World!\n" and exit.
+->stdout__H,stdout__e,stdout__l,stdout__l,stdout__o->stdout_2C,stdout_20;
+->stdout__W,stdout__o,stdout__r,stdout__l,stdout__d->stdout_21,stdout_0A.
 ```
 
 Grammar
@@ -58,4 +56,3 @@ Ideas for garbage collection (memory optimization):
 + Collect channels if all existing sender processes have finished.
 + Collect processes if the trigger channel is cleaned up (this may included
   replicated processes).
-  
