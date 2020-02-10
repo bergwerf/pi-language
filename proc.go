@@ -58,6 +58,7 @@ func (v Var) ID(node Node) uint {
 // Proc represents a node in the processed program AST. Proc is similar to
 // Process but contains additional information.
 type Proc struct {
+	Loc      Loc
 	Type     int
 	Channel  Var     // Variable for allocated and receive/send channel
 	Message  Var     // Variable for receive/send message
@@ -78,7 +79,8 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 				r1, r2 = p.R[0:1], p.R[1:]
 			}
 
-			pIn := &Process{p.Type, l1, r1, []*Process{&Process{p.Type, l2, r2, p.Children}}}
+			pIn := &Process{p.Loc, p.Type, l1, r1,
+				[]*Process{&Process{p.Loc, p.Type, l2, r2, p.Children}}}
 			pOut := ProcessProgram([]*Process{pIn}, seq, bound, err)
 
 			assert(len(pOut) == 1)
@@ -95,7 +97,7 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 		case ASTCreate:
 			created := Var{false, seq, p.R[0]}
 			children := ProcessProgram(p.Children, seq+1, bindName(bound, created), err)
-			proc = append(proc, &Proc{PINewRef, created, Var{}, children})
+			proc = append(proc, &Proc{p.Loc, PINewRef, created, Var{}, children})
 
 		case ASTReceiveOne:
 			fallthrough
@@ -108,13 +110,12 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 				if len(p.L[0]) == 0 {
 					// Pop message right after receiving it.
 					children := ProcessProgram(p.Children, seq, bound, err)
-					proc = append(proc, &Proc{subscribeType, channel, message, []*Proc{
-						&Proc{PIPopRef, message, Var{}, children},
-					}})
+					proc = append(proc, &Proc{p.Loc, subscribeType, channel, message,
+						[]*Proc{&Proc{p.Loc, PIPopRef, message, Var{}, children}}})
 				} else {
 					// Bind message to the next reference index.
 					children := ProcessProgram(p.Children, seq+1, bindName(bound, message), err)
-					proc = append(proc, &Proc{subscribeType, channel, message, children})
+					proc = append(proc, &Proc{p.Loc, subscribeType, channel, message, children})
 				}
 			}
 
@@ -126,15 +127,15 @@ func ProcessProgram(program []*Process, seq uint, bound map[string]uint, err *er
 				if len(p.L[0]) == 0 {
 					// Create temporary message channel.
 					message := Var{false, seq, "<tmp>"}
-					proc = append(proc, &Proc{PINewRef, message, Var{}, []*Proc{
-						&Proc{PISend, channel, message, []*Proc{
-							&Proc{PIPopRef, message, Var{}, children},
+					proc = append(proc, &Proc{p.Loc, PINewRef, message, Var{}, []*Proc{
+						&Proc{p.Loc, PISend, channel, message, []*Proc{
+							&Proc{p.Loc, PIPopRef, message, Var{}, children},
 						}},
 					}})
 				} else {
 					// Lookup message in bound variables.
 					message := resolveName(p.L[0], bound, err)
-					proc = append(proc, &Proc{PISend, channel, message, children})
+					proc = append(proc, &Proc{p.Loc, PISend, channel, message, children})
 				}
 			}
 		}

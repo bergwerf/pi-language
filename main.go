@@ -24,7 +24,8 @@ func main() {
 		if strings.HasPrefix(arg, "--stdin=") {
 			stdin = strings.NewReader(arg[8:])
 		} else {
-			stack = append(stack, arg)
+			path, _ := filepath.Abs(arg)
+			stack = append(stack, path)
 		}
 	}
 
@@ -43,17 +44,17 @@ func main() {
 		}
 
 		// Extract directives.
-		attachAdd, globalAdd, source := ExtractDirectives(string(bytes))
+		attachAdd, globalAdd, offset, source := ExtractDirectives(string(bytes))
 		global.AddAll(globalAdd)
 
 		// Add attached files relative to this file.
 		for _, attachment := range attachAdd {
-			abs := filepath.Join(filepath.Dir(path), attachment)
+			abs, _ := filepath.Abs(filepath.Join(filepath.Dir(path), attachment))
 			stack = append(stack, abs)
 		}
 
 		// Try to parse.
-		proc, parseErr := Parse(source)
+		proc, parseErr := Parse(source, Loc{path, offset + 1, 0})
 		program = append(program, proc...)
 		if len(parseErr) != 0 {
 			for _, e := range parseErr {
@@ -65,7 +66,8 @@ func main() {
 
 	// Wrap all processes in globally defined names.
 	if len(global) > 0 {
-		program = []*Process{&Process{ASTCreate, nil, global.ToSlice(), program}}
+		program = []*Process{
+			&Process{Loc{}, ASTCreate, nil, global.ToSlice(), program}}
 	}
 
 	// Process program.

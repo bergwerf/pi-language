@@ -82,15 +82,21 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 			case PISend:
 				channel := node.Proc.Channel.ID(node)
 				message := node.Proc.Message.ID(node)
-				seq := send(ether, channel, message, node.Proc)
-
-				// Set sequence number for this channel. We do not set sequence numbers
-				// for special channels.
 				seqs := node.Seqs
-				if !node.Proc.Channel.Raw {
-					seqs = make([]uint, len(node.Seqs))
-					copy(seqs, node.Seqs)
-					seqs[node.Proc.Channel.Value] = uint(seq)
+
+				// Messages to the debug interface channel are handled immediately. This
+				// is practical because if we wait the subscriber map may change.
+				if channel == specialChannels["debug"] {
+					printDebugInfo(sub, message)
+				} else {
+					// Otherwise send and update sequence number for this channel. We do
+					// not set sequence numbers for interface channels.
+					seq := send(ether, channel, message, node.Proc)
+					if !node.Proc.Channel.Raw {
+						seqs = make([]uint, len(node.Seqs))
+						copy(seqs, node.Seqs)
+						seqs[node.Proc.Channel.Value] = uint(seq)
+					}
 				}
 
 				for _, p := range node.Proc.Children {
@@ -140,11 +146,7 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 			}
 
 			// Handle interface messages.
-			if channel == specialChannels["debug"] {
-				printDebugInfo(sub, msg)
-			} else {
-				handleInterfaceMessage(input, output, ether, channel, msg.ID)
-			}
+			handleInterfaceMessage(input, output, ether, channel, msg.ID)
 		}
 	}
 }
@@ -193,19 +195,16 @@ func handleInterfaceMessage(
 	}
 }
 
-func printDebugInfo(sub map[uint]*list.List, msg Msg) {
-	fmt.Printf("--- START DEBUG INFO ---")
-	fmt.Printf("message { Seq: %v, ID: %v }\n", msg.Seq, msg.ID)
-	if subs, nonEmpty := sub[msg.ID]; nonEmpty {
-		fmt.Printf("subscribers:\n")
+// Print subscribers of a channel.
+func printDebugInfo(sub map[uint]*list.List, channel uint) {
+	println()
+	println("--- DEBUG SECTION ---")
+	fmt.Printf("channel: %v\n", channel)
+	if subs, nonEmpty := sub[channel]; nonEmpty && subs.Len() > 0 {
 		for n := subs.Front(); n != nil; n = n.Next() {
-			// Next time we need this it may be more useful to print the source
-			// location at which this process is defined.
 			node := n.Value.(Node)
-			fmt.Printf("- node of type %v\n", node.Proc.Type)
+			fmt.Printf("+ %v\n", node.Proc.Loc)
 		}
-	} else {
-		println("no subscribers")
 	}
-	fmt.Printf("--- END DEBUG INFO ---")
+	println("---------------------")
 }

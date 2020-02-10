@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // Line comment flag.
@@ -37,27 +39,45 @@ const (
 	ASTSend
 )
 
-// A token
-type tok struct {
-	t       int
-	content string
+// Loc contains a file location.
+type Loc struct {
+	Path    string
+	Ln, Col int
+}
+
+func (l Loc) String() string {
+	if len(l.Path) == 0 {
+		return "<internal>"
+	}
+	return fmt.Sprintf("%v:%v;%v", filepath.Base(l.Path), l.Ln, l.Col)
 }
 
 // Process is the primary AST node for PI programs.
 type Process struct {
-	Type     int        // Node type
-	L, R     []string   // Variable names
-	Children []*Process // Child processes
+	Loc      Loc
+	Type     int
+	L, R     []string
+	Children []*Process
+}
+
+// A token
+type token struct {
+	loc     Loc
+	t       int
+	content string
 }
 
 // Parse parses PI program code and returns an AST.
-func Parse(source string) ([]*Process, []error) {
+func Parse(source string, start Loc) ([]*Process, []error) {
 	// Tokenize and parse input. To simplify parsing we add parentheses around the
 	// entire source (allowing parallel processes in the global scope), and a
 	// padding tokens at the end (for an easier out of bounds check).
-	open, close, eof := tok{ParOpen, ""}, tok{ParClose, ""}, tok{EOFMark, ""}
-	tokens1 := tokenize(source)
-	tokens2 := append(append([]tok{open}, tokens1...), close, eof)
+	openTok := token{Loc{}, ParOpen, ""}
+	closeTok := token{Loc{}, ParClose, ""}
+	eofTok := token{Loc{}, EOFMark, ""}
+
+	tokens1 := tokenize(source, start)
+	tokens2 := append(append([]token{openTok}, tokens1...), closeTok, eofTok)
 	err := errorList([]error{})
 	proc, index := parse(tokens2, 0, &err)
 
@@ -75,7 +95,7 @@ func Parse(source string) ([]*Process, []error) {
 // Slightly more variations than the formal grammar are allowed: receive and
 // bind statements without subsequent process, no Semicolon before a ParOpen,
 // duplicate Semicolon or Period.
-func parse(tokens []tok, index int, err *errorList) ([]*Process, int) {
+func parse(tokens []token, index int, err *errorList) ([]*Process, int) {
 	// Check bounds. Note that we always end with ParClose and EOF. The ParOpen
 	// case already generates an error for this case, we only move the index to
 	// the EOF token.
@@ -83,12 +103,13 @@ func parse(tokens []tok, index int, err *errorList) ([]*Process, int) {
 		return nil, len(tokens) - 1
 	}
 
+	loc := tokens[index].loc
 	switch tokens[index].t {
 	// Plus: channel creation.
 	case Plus:
 		names := splitVariable(tokens[index+1], false, err)
 		children, end := parse(tokens, index+2, err)
-		return []*Process{&Process{ASTCreate, nil, names, children}}, end
+		return []*Process{&Process{loc, ASTCreate, nil, names, children}}, end
 
 	// Semicolon: return process after semi-colon.
 	case Semicolon:
@@ -106,11 +127,11 @@ func parse(tokens []tok, index int, err *errorList) ([]*Process, int) {
 
 		switch tokens[index+1].t {
 		case ReceiveOneSymbol:
-			return []*Process{&Process{ASTReceiveOne, l, r, c}}, end
+			return []*Process{&Process{loc, ASTReceiveOne, l, r, c}}, end
 		case ReceiveAllSymbol:
-			return []*Process{&Process{ASTReceiveAll, l, r, c}}, end
+			return []*Process{&Process{loc, ASTReceiveAll, l, r, c}}, end
 		case SendSymbol:
-			return []*Process{&Process{ASTSend, l, r, c}}, end
+			return []*Process{&Process{loc, ASTSend, l, r, c}}, end
 		default:
 			err.Add(fmt.Errorf("unexpected token"))
 			return nil, index
@@ -145,7 +166,7 @@ func parse(tokens []tok, index int, err *errorList) ([]*Process, int) {
 
 // Extract a list of valid names from the given token and return it. To make
 // splitting easier the comma is not parsed as a separate token by tokenize.
-func splitVariable(variable tok, allowEmpty bool, err *errorList) []string {
+func splitVariable(variable token, allowEmpty bool, err *errorList) []string {
 	if variable.t != Variable {
 		err.Add(fmt.Errorf("expected variable token"))
 		return nil
@@ -166,34 +187,41 @@ func splitVariable(variable tok, allowEmpty bool, err *errorList) []string {
 }
 
 // Extract source tokens and remove whitespace and comments. Illegal variable
-// names or other bad syntax are not handled by this function. This step is
-// mundane but allows for a cleaner parsing algorithm.
-func tokenize(source string) []tok {
-	tokens := make([]tok, 0)
-	acc := ""
-	comment := false
+// names or other bad syntax are not handled by this function.
+func tokenize(source string, start Loc) []token {
+	tokens := make([]token, 0)
+	loc, comment, acc := start, false, ""
+	// We don't use range because we want to look ahead.
 	for i := 0; i < len(source); i++ {
 		c := source[i]
-		if comment {
-			comment = (c != '\n')
+		loc.Col++
+
+		// Update line number and skip whitespace and comments.
+		if c == '\n' {
+			loc.Ln, loc.Col = loc.Ln+1, 0
+			comment = false
+			continue
+		} else if unicode.IsSpace(rune(c)) || comment {
 			continue
 		}
-		v := tok{Variable, strings.TrimSpace(acc)}
+
+		// A variable loc is that of the control symbol that follows it.
+		v := token{loc, Variable, acc}
 		switch c {
 		case lineComment:
 			comment = true
 		case '+':
-			tokens = append(tokens, tok{Plus, ""})
+			tokens = append(tokens, token{loc, Plus, ""})
 		case ';':
-			tokens = append(tokens, v, tok{Semicolon, ""})
 			acc = ""
+			tokens = append(tokens, v, token{loc, Semicolon, ""})
 		case '.':
-			tokens = append(tokens, v, tok{Period, ""})
 			acc = ""
+			tokens = append(tokens, v, token{loc, Period, ""})
 		case '(':
-			tokens = append(tokens, tok{ParOpen, ""})
+			tokens = append(tokens, token{loc, ParOpen, ""})
 		case ')':
-			tokens = append(tokens, tok{ParClose, ""})
+			tokens = append(tokens, token{loc, ParClose, ""})
 		default:
 			if len(source) <= i+2 {
 				acc += string(c)
@@ -201,20 +229,18 @@ func tokenize(source string) []tok {
 			}
 			switch source[i : i+2] {
 			case "<-":
-				tokens = append(tokens, v, tok{ReceiveOneSymbol, ""})
-				acc = ""
-				i++
+				tokens = append(tokens, v, token{loc, ReceiveOneSymbol, ""})
 			case "<<":
-				tokens = append(tokens, v, tok{ReceiveAllSymbol, ""})
-				acc = ""
-				i++
+				tokens = append(tokens, v, token{loc, ReceiveAllSymbol, ""})
 			case "->":
-				tokens = append(tokens, v, tok{SendSymbol, ""})
-				acc = ""
-				i++
+				tokens = append(tokens, v, token{loc, SendSymbol, ""})
 			default:
 				acc += string(c)
+				continue // !
 			}
+			acc = ""
+			loc.Col++
+			i++
 		}
 	}
 	return tokens
@@ -224,7 +250,7 @@ func tokenize(source string) []tok {
 // source and returns them as a map with the remaining code. Directives can only
 // occur before any PI script and do not depend on each other. Comments and
 // empty lines are allowed between directives.
-func ExtractDirectives(source string) ([]string, []string, string) {
+func ExtractDirectives(source string) ([]string, []string, int, string) {
 	lines := strings.Split(source, "\n")
 	attach, global := make([]string, 0), make([]string, 0)
 	for i, line := range lines {
@@ -244,8 +270,8 @@ func ExtractDirectives(source string) ([]string, []string, string) {
 			continue
 		} else {
 			// End of directives; return result.
-			return attach, global, strings.Join(lines[i:], "\n")
+			return attach, global, i, strings.Join(lines[i:], "\n")
 		}
 	}
-	return attach, global, ""
+	return attach, global, len(lines), ""
 }
