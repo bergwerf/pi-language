@@ -19,12 +19,13 @@ var (
 
 	// Other channels
 	specialChannels = map[string]uint{
-		"stdin_read": uint(512),
-		"stdin_EOF":  uint(513),
-		"debug":      uint(514),
+		"stdin_read":   uint(512),
+		"stdin_EOF":    uint(513),
+		"stdout_write": uint(514),
+		"debug":        uint(515),
 	}
 
-	reservedLength = uint(515)
+	reservedLength = uint(516)
 )
 
 // Proc types

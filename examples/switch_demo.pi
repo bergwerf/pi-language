@@ -3,14 +3,14 @@
 
 #attach: lib/bool.pi
 
-+c;c->switch; set_tt,set_ff,value,ready<-c;(
-  <-ready;->stdin_read.
-  <<stdin__O; +c;c->value; +tt,ff;(
-    tt,ff->c.
-    <-tt;->stdout__T;->stdin_read.
-    <-ff;->stdout__F;->stdin_read.
-  )
-  <<stdin__T; +c;c->set_tt; <-c;->stdin_read.
-  <<stdin__F; +c;c->set_ff; <-c;->stdin_read.
++c;c->switch; set_tt,set_ff,value<-c;(
+  ->stdin_read.
   <-stdin_EOF; ->stdout_0A.
+  <<stdin__T; +c;c->set_tt;<-c; ->stdin_read.
+  <<stdin__F; +c;c->set_ff;<-c; ->stdin_read.
+  <<stdin__O; +c;c->value;<-c; +tt,ff;(
+    tt,ff->c.
+    <-tt;->stdout__T;<-stdout_write;->stdin_read.
+    <-ff;->stdout__F;<-stdout_write;->stdin_read.
+  )
 )

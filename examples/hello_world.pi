@@ -1,3 +1,15 @@
 ! Print "Hello, World!\n" and exit.
-->stdout__H,stdout__e,stdout__l,stdout__l,stdout__o->stdout_2C,stdout_20;
-->stdout__W,stdout__o,stdout__r,stdout__l,stdout__d->stdout_21,stdout_0A.
+->stdout__H;<-stdout_write;
+->stdout__e;<-stdout_write;
+->stdout__l;<-stdout_write;
+->stdout__l;<-stdout_write;
+->stdout__o;<-stdout_write;
+->stdout_2C;<-stdout_write;
+->stdout_20;<-stdout_write;
+->stdout__W;<-stdout_write;
+->stdout__o;<-stdout_write;
+->stdout__r;<-stdout_write;
+->stdout__l;<-stdout_write;
+->stdout__d;<-stdout_write;
+->stdout_21;<-stdout_write;
+->stdout_0A;<-stdout_write.

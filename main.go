@@ -76,7 +76,7 @@ func main() {
 			println(e.Error())
 		}
 	} else {
-		// Simulate program.
-		Simulate(proc, stdin, os.Stdout)
+		// Run program.
+		RunProc(proc, stdin, os.Stdout)
 	}
 }

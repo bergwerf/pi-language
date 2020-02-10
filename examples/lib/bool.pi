@@ -2,24 +2,31 @@
 #global: ff
 #global: switch
 
-c<<tt; t,f<-c; ->t.
-c<<ff; t,f<-c; ->f.
+c<<tt; ->c; t,f<-c; ->t.
+c<<ff; ->c; t,f<-c; ->f.
 
-c<<switch;
-  +set_tt,set_ff,value,_val,get_tt,get_ff,ready;
-  set_tt,set_ff,value,ready->c;(
-    ->get_tt;->ready.
-    <<get_tt; c<-_val; keep,t,<-c; +b,if,else;(
-      b->keep; if,else->b.
-      <-if;->get_tt;->t.
-      <-else;->t.
-    )
-    <<get_ff; c<-_val; keep,,f<-c; +b,if,else;(
-      b->keep; if,else->b.
-      <-if;->get_ff;->f.
-      <-else;->f.
-    )
-    ready<<set_tt; +c;c->_val; ff,,->c; ->get_tt;->ready.
-    ready<<set_ff; +c;c->_val; ff,,->c; ->get_ff;->ready.
-    c<<value; +cc;cc->_val; t,f<-c; tt,t,f->cc.
+! Switch (true/false) construction
+c<<switch; +set_tt,set_ff,value,_set_tt,_set_ff,_val;(
+  +init;init->_set_tt;<-init; set_tt,set_ff,value->c.
+
+  ! Set switch to true for one _val request (may repeat itself)
+  ack<<_set_tt;->ack; c<-_val;->c; repeat,t,<-c; +b,if,else;(
+    b->repeat;<-b; if,else->b.
+    <-if;->_set_tt;->t.
+    <-else;->t.
   )
+
+  ! Same as _set_tt but for false
+  ack<<_set_ff;->ack; c<-_val;->c; repeat,,f<-c; +b,if,else;(
+    b->repeat;<-b; if,else->b.
+    <-if;->_set_ff;->f.
+    <-else;->f.
+  )
+
+  ! Override current _val listener with new switch value.
+  ready<<set_tt; +c;c->_val;<-c; ff,,->c; ready->_set_tt.
+  ready<<set_ff; +c;c->_val;<-c; ff,,->c; ready->_set_ff.
+
+  ! Public value request channel (repeats current value after each request)
+  c<<value;->c; t,f<-c; +cc;cc->_val;<-cc; tt,t,f->cc.
+)
