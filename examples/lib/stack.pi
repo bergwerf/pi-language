@@ -1,30 +1,32 @@
 #attach: bool.pi
 #global: stack
 
-r<<stack;
-  ! Return stack interface.
-  +push,pop,_pop,ready,peek; push,pop,ready,peek->r;(
-    ! Empty item
-    +empty_item;(
-      ->empty_item;->ready.
-      <<empty_item; c<-_pop; cascade<-c; tt,c,empty_item->c; +b;do;(
-        b->cascade; do,->b.
-        <-do;->empty_item.
-      )
+r<<stack; +push,pop,_pop,peek;(
+  ! Empty item
+  +bottom;(
+    +init;init->bottom;<-init; push,pop,peek->r.
+    ack<<bottom;->ack; c<-_pop; cascade<-c; +if,else,finish;(
+      +b;b->cascade;<-b; tt,ff->b.
+      <-if; finish->bottom.
+      <-else; ->finish.
+      <-finish; tt,c,bottom->c.
     )
-    
-    ! Push item
-    a<<push; x<-a; +ready;ready->a; +c;c->_pop; ff->c; _,_,prev<-c; +item;(
-      ->item;->ready.
-      <<item; c<-_pop; cascade<-c; ff,x,item->c; +b,do;(
-        b->cascade; do,->cascade.
-        <-do;->prev.
-      )
-    )
-    
-    ! Pop item
-    c<<pop; +cc;cc->_pop;tt->cc; empty,x<-cc; empty,x->c.
-
-    ! Peek at top item
-    c<<peek; +cc;cc->_pop; ff->cc; _,x,item<-cc; ->item; x->c.
   )
+
+  ! Push item
+  a<<push; x<-a; +c;c->_pop; ff->c; _,_,prev<-c; +item;(
+    +ack;ack->item;<-ack; ->a.
+    ack<<item;->ack; c<-_pop; cascade<-c; +if,else,finish;(
+      +b;b->cascade;<-b; if,else->b.
+      <-if; finish->prev.
+      <-else; ->finish.
+      <-finish; ff,x,item->c.
+    )
+  )
+
+  ! Pop item
+  c<<pop; +cc;cc->_pop; tt->cc; empty,x<-cc; empty,x->c.
+
+  ! Peek at top item
+  c<<peek; +cc;cc->_pop; ff->cc; _,x,item<-cc; +ack;ack->item;<-ack; x->c.
+)

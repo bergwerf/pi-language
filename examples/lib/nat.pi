@@ -10,17 +10,17 @@
 ! We attach a process to n that acts as a zero encoding; when a channel r is
 ! sent to n, it will receive channel a (accumulator) and z (zero) over which
 ! the number value is transmitted.
-n<<0;r<<n; +a,z; a,z->r; +x;x->z.
-n<<1;r<<n; +a,z; a,z->r; +x;x->a;x->z.
+n<<0;r<<n; +a,z; a,z->r;<-r; +x;x->z.
+n<<1;r<<n; +a,z; a,z->r;<-r; +x;x->a;x->z.
 
 ! Addition of two encoded numbers.
 xy<<add; x,y<-xy; +n;(
   n->xy.
-  r<<n; +a,z; a,z->r; +r_x,r_y,z_xy;(
+  r<<n; +a,z; a,z->r;<-r; +r_x,r_y,z_xy;(
     r_x->x.
     r_y->y.
-    a_x,z_x<-r_x;(t<<a_x;t->a. t<-z_x;t->z_xy.)
-    a_y,z_y<-r_y;(t<<a_y;t->a. t<-z_y;t->z_xy.)
+    a_x,z_x<-r_x;->r_x; (t<<a_x;t->a. t<-z_x;t->z_xy.)
+    a_y,z_y<-r_y;->r_y; (t<<a_y;t->a. t<-z_y;t->z_xy.)
     t,t<-z_xy;t->z.
   )
 )
@@ -28,18 +28,17 @@ xy<<add; x,y<-xy; +n;(
 ! Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
 
 ! Read unary number from stdin.
-ret<<read_unary; read_ready<-ret;
-  +c;c->stack; push,pop,ready<-c; <-ready;
-  0->push; +n;(
-    <-stdin__0; +top;top->pop; empty,n<-top; n->ret.
-    <<stdin__1; +top;top->pop; empty,n<-top; +do;(
-      do->empty;->empty.
-      <-do; +c;c->add; n,1->c; m<-c; +c;c->push;(
-        m->c.
-        ready<-c; <-ready; ->stdin_read.
-      )
+sync<<read_unary; +c;c->stack; push,pop,ready<-c; <-ready; 0->push; +n;(
+  ->stdin_read.
+  <-stdin__0; +top;top->pop; ,n<-top; n->sync.
+  <<stdin__1; +top;top->pop; ,n<-top; +do;(
+    +b;b->empty;<-b; do,->b.
+    <-do; +c;c->add; n,1->c; m<-c; +c;c->push;(
+      m->c.
+      ready<-c; <-ready; ->stdin_read.
     )
   )
+)
 
 ! Write unary number to stdout.
 n<<write_unary; +c;(

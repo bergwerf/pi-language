@@ -1,6 +1,9 @@
+#attach: cell.pi
+
 #global: tt
 #global: ff
 #global: switch
+#global: bool
 
 c<<tt; ->c; t,f<-c; ->t.
 c<<ff; ->c; t,f<-c; ->f.
@@ -10,15 +13,15 @@ c<<switch; +set_tt,set_ff,value,_set_tt,_set_ff,_val;(
   +init;init->_set_tt;<-init; set_tt,set_ff,value->c.
 
   ! Set switch to true for one _val request (may repeat itself)
-  ack<<_set_tt;->ack; c<-_val;->c; repeat,t,<-c; +b,if,else;(
-    b->repeat;<-b; if,else->b.
+  ack<<_set_tt;->ack; c<-_val;->c; repeat,t,<-c; +if,else;(
+    +b;b->repeat;<-b; if,else->b.
     <-if;->_set_tt;->t.
     <-else;->t.
   )
 
   ! Same as _set_tt but for false
-  ack<<_set_ff;->ack; c<-_val;->c; repeat,,f<-c; +b,if,else;(
-    b->repeat;<-b; if,else->b.
+  ack<<_set_ff;->ack; c<-_val;->c; repeat,,f<-c; +if,else;(
+    +b;b->repeat;<-b; if,else->b.
     <-if;->_set_ff;->f.
     <-else;->f.
   )
@@ -29,4 +32,17 @@ c<<switch; +set_tt,set_ff,value,_set_tt,_set_ff,_val;(
 
   ! Public value request channel (repeats current value after each request)
   c<<value;->c; t,f<-c; +cc;cc->_val;<-cc; tt,t,f->cc.
+)
+
+! Switch using a cell.
+c<<bool; +cc;cc->cell; get,set<-cc; +set_tt,set_ff,value;(
+  ! Set to true initially.
+  +init;init->set_ff;<-init; set_tt,set_ff,value->c.
+
+  ! Setters
+  ready<<set_tt; +a;a->set;<-a; tt->a;<-a; ->ready.
+  ready<<set_ff; +a;a->set;<-a; ff->a;<-a; ->ready.
+
+  ! Getter
+  c<<value;->c; t,f<-c; +a;a->get; x<-a; +b;b->x;<-b; t,f->b.
 )

@@ -25,7 +25,7 @@ var (
 		"debug":        uint(515),
 	}
 
-	reservedLength = uint(516)
+	reservedChannelIDs = uint(516)
 )
 
 // Proc types

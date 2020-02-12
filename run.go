@@ -30,7 +30,7 @@ type Channel struct {
 // RunProc runs the given pre-processed program.
 func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 	// Global channel identifier sequence.
-	channels := reservedLength
+	channels := reservedChannelIDs
 
 	queue := make([]Node, 0)         // Scheduled nodes
 	ether := make(map[uint]*Channel) // Floating messages
@@ -43,7 +43,8 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 
 	// Run simulation until no more nodes are scheduled for running time and the
 	// ether is empty (all messages have been delivered).
-	for len(queue)+len(ether) > 0 {
+	pendingMessages := 0
+	for len(queue)+pendingMessages > 0 {
 		// There are a lot of different ways to decide which process gets to run
 		// next or which message is delivered next. Randomizing this might be
 		// interesting for fuzzing. Trying all permutations could prove the
@@ -108,7 +109,8 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 		// Deliver some messages.
 		for channel, info := range ether {
 			if len(info.Messages) == 0 {
-				delete(ether, channel)
+				// Do not delete! This will reset the sequence number on this channel
+				// resulting in skipped messages.
 				continue
 			}
 
@@ -127,7 +129,8 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 					// We do not do sequence checks on interface channels because you
 					// should not both send and listen on those (perhaps this is a bit of
 					// a silly optimization).
-					if !p.Channel.Raw && uint(msg.Seq) <= node.Seqs[p.Channel.Value] {
+					if channel >= reservedChannelIDs &&
+						uint(msg.Seq) <= node.Seqs[p.Channel.Value] {
 						continue
 					}
 
@@ -147,6 +150,13 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 
 			// Handle interface messages.
 			handleInterfaceMessage(input, output, ether, channel, msg.ID)
+		}
+
+		// Count number of messages left. Note that handleInterfaceMessage may have
+		// added messages that we could not count before.
+		pendingMessages = 0
+		for _, info := range ether {
+			pendingMessages += len(info.Messages)
 		}
 	}
 }
