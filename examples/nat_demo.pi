@@ -2,4 +2,4 @@
 
 #attach: lib/nat.pi
 
-x<-<read_unary; y<-<read_unary; z<-[x,y>->add]; z->write_unary.
+x<-<read_unary; y<-<read_unary; +ret; x,y,ret>->add; z<-ret; z->write_unary.

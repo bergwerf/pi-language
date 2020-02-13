@@ -79,7 +79,7 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 
 				// Messages to the debug interface channel are handled immediately. This
 				// is practical because if we wait the subscriber map may change.
-				if channel == specialChannels["debug"] {
+				if channel == specialChannels["DEBUG"] {
 					printDebugInfo(sub, message)
 				} else {
 					// Otherwise send and update sequence number for this channel. We do

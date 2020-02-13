@@ -6,20 +6,22 @@ c<<cell; +get,set,_get,_set;(
   get,set->c.
 
   ! _get imposter for initial value
-  r<-_get;->r; <-r;->r.
+  reset,ret<<-_get; ->ret.
 
   ! Start new _get cycle.
-  a<<_set;->a; x<-a;(->a.
-    r<-_get;->r; reset<-r; +if,else;(
+  x,ack<<<_set;(
+    ->ack.
+    reset,ret<<-_get; +if,else;(
       if,else>->reset.
-      <-if; +a;a->_set;<-a; x->a;<-a; x->r.
-      <-else; x->r.
+      <-if; +ack; x,ack>->_set; <-ack; x->ret.
+      <-else; x->ret.
     )
   )
 
-  ! Set value by overriding the current _get cycle.
-  a<<set; +c;c->_get;<-c; ff->c;<-c; a->_set.
+  ! Set value by overriding the current _get cycle. Note that we are forwarding
+  ! a tunnel through which arguments are supplied to _set.
+  t<<set; +ret; ff,ret>->_get; <-ret; t->_set.
 
   ! Get current value.
-  a<<get; +r;r->_get;<-r; tt->r; x<-r; x->a.
+  c<<get; tt,c>->_get.
 )

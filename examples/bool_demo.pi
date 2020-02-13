@@ -4,7 +4,7 @@
 #attach: lib/bool.pi
 
 ! Works with switch and bool.
-+c;c->bool; set_tt,set_ff,value<-c;(
+set_tt,set_ff,value<-<bool;(
   ->stdin_read.
   <-stdin_EOF; ->stdout_0A.
   <<stdin__T; <>set_tt; ->stdin_read.

@@ -9,35 +9,38 @@
 
 ! Numbers have a counter interface with a step channel and a zero channel which
 ! will return ff or tt (if it is the last step).
-c<<0; +step,zero; step,zero->c; <-step;tt->zero.
-c<<1; +step,zero; step,zero->c; <-step;ff->zero; <-step;tt->zero.
+c<<0; +step,zero->c; <-step;tt->zero.
+c<<1; +step,zero->c; <-step;ff->zero; <-step;tt->zero.
 
 ! Addition of two encoded numbers.
-xy<<add;->xy; x,y<-xy; ,next,stage<-<bool; +n;n->xy;
-  c<<n; sx,zx<-<x; sy,zy<-<y; +step,zero; step,zero->c;
-    <<step; +use_x,use_y;(
-      use_x,use_y>->stage.
-      <-use_x; ->sx; is_zero<-zx; +t,f;(
-        t,f>->is_zero.
-        <-t; <>next; ->step.
-        <-f; ff->zero.
-      )
-      <-use_y; ->sy; is_zero<-zy; +t,f;(
-        t,f>->is_zero.
-        <-t; tt->zero.
-        <-f; ff->zero.
-      )
-    )
+x,y,ret<<<add; +n->ret;
+c<<n; sx,zx<-<x; sy,zy<-<y; ,next,stage<-<bool; +step,zero->c;
+<<step; +use_x,use_y;(
+  use_x,use_y>->stage.
+  <-use_x; ->sx; is_zero<-zx; +t,f;(
+    t,f>->is_zero.
+    <-t; <>next; ->step.
+    <-f; ff->zero.
+  )
+  <-use_y; ->sy; is_zero<-zy; +t,f;(
+    t,f>->is_zero.
+    <-t; tt->zero.
+    <-f; ff->zero.
+  )
+)
 
 ! Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
 
 ! Read unary number from stdin.
-r<<read_unary; push,pop<-<stack; <-[0>->push];(
+c<<read_unary; push,pop<-<stack; +ack; 0,ack>->push; <-ack;(
   ->stdin_read.
-  <-stdin__0; empty,n<-<pop; n->r.
+  <-stdin__0; empty,n<-<pop; n->c.
   <<stdin__1; empty,n<-<pop; +next;(
     ,next>->empty.
-    <-next; m<-[n,1>->add]; <-[m>->push]; ->stdin_read.
+    <-next;
+      +ret; n,1,ret>->add; m<-ret;
+      +ack; m,ack>->push; <-ack;
+      ->stdin_read.
   )
 )
 

@@ -53,17 +53,10 @@ var extendedSyntax = []Rewrite{
 	// Remove comments.
 	rw("!.*", ""),
 
-	// Variadic create: +a,b === +a;+b
-	rw("\\+%v,%v", "+%[1]v;+%[2]v", argument, argument),
+	// 1. Basic shortcuts
 
-	// Variadic receive: a,b<-x === a<-x;b<-x
-	rw("%v,%v<-%v", "%[1]v<-%[3]v;%[2]v<-%[3]v", argument, argument, name),
-
-	// Variadic send LHS: a,b->x === a->x;b->x
-	rw("%v,%v->%v", "%[1]v->%[3]v;%[2]v->%[3]v", argument, argument, name),
-
-	// Variadic send RHS: a->b,c === a->b;a->c
-	rw("%v->%v,%v", "%[1]v->%[2]v;%[1]v->%[3]v", argument, argument, argument),
+	// Create and send: +y->x === +y;y->x
+	rw("\\+%v->%v", "+%[1]v;%[1]v->%[2]v", argument, argument),
 
 	// Wait for trigger: <-x === @<-x
 	rw("<-%v", "@1<-%[1]v", name),
@@ -77,17 +70,38 @@ var extendedSyntax = []Rewrite{
 	// Trigger and wait: <>x === +@;@->x;<-@
 	rw("<>%v", "+@4;@4->%[1]v;<-@4", name),
 
-	// Send tunnel: y>->x === +@;@->x;<-@;y->@
-	rw("%v>->%v", "+@5;@5->%[2]v;<-@5;%[1]v->@5", argument, name),
-
-	// Receive tunnel: y<-<x === +@;@->x;y<-@
-	rw("%v<-<%v", "+@6;@6->%[2]v;%[1]v<-@6", argument, name),
-
-	// Send and receive tunnel: z<-[y>->x] === +@;@->x;<-@;y->@;z<-@
-	rw("%v<-\\[%v>->%v\\]", "+@7;@7->%[3]v;<-@7;%[2]v->@7;%[1]v<-@7", argument, argument, name),
-
 	// Forward to channel: x>>y === @<<x;@->y
-	rw("%v>>%v", "@8<<%[1]v;@8->%[2]v", name, argument),
+	rw("%v>>%v", "@5<<%[1]v;@5->%[2]v", name, argument),
+
+	// 2. Variadic variants
+
+	// Variadic create: +a,b === +a;+b
+	rw("\\+%v,%v", "+%[1]v;+%[2]v", argument, argument),
+
+	// Variadic receive: a,b<-x === a<-x;b<-x
+	rw("%v,%v<-%v", "%[1]v<-%[3]v;%[2]v<-%[3]v", argument, argument, name),
+
+	// Variadic send LHS: a,b->x === a->x;b->x
+	rw("%v,%v->%v", "%[1]v->%[3]v;%[2]v->%[3]v", argument, argument, name),
+
+	// Variadic send RHS: a->b,c === a->b;a->c
+	rw("%v->%v,%v", "%[1]v->%[2]v;%[1]v->%[3]v", argument, argument, argument),
+
+	// 3. Sending a tunnel to send or receive a stream.
+
+	// Send through tunnel: y>->x === +@;@->x;<-@;y->@
+	rw("%v>->%v", "+@6;@6->%[2]v;<-@6;%[1]v->@6", argument, name),
+
+	// Receive through tunnel: y<-<x === +@;@->x;y<-@
+	rw("%v<-<%v", "+@7;@7->%[2]v;%[1]v<-@7", argument, name),
+
+	// 4. Receiving a tunnel to send or receive a stream.
+
+	// Tunneled receive one: y<<-x === @<-x;->@;y<-@
+	rw("%v<<-%v", "@8<-%[2]v;->@8;%[1]v<-@8", argument, name),
+
+	// Tunneled receive all: y<<<x === @<<x;->@;y<-@
+	rw("%v<<<%v", "@9<<%[2]v;->@9;%[1]v<-@9", argument, name),
 }
 
 // Interface channels
@@ -106,7 +120,7 @@ var (
 		"stdin_read":   uint(512),
 		"stdin_EOF":    uint(513),
 		"stdout_write": uint(514),
-		"debug":        uint(515),
+		"DEBUG":        uint(515),
 	}
 
 	reservedChannelIDs = uint(516)

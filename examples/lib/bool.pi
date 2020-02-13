@@ -8,41 +8,15 @@
 c<<tt;->c; t,f<-c;->t.
 c<<ff;->c; t,f<-c;->f.
 
-! Switch (true/false) construction
-c<<switch; +set_tt,set_ff,value,_set_tt,_set_ff,_val;(
-  <>_set_tt; set_tt,set_ff,value->c.
-
-  ! Set switch to true for one _val request (may repeat itself)
-  ack<<_set_tt;->ack; c<-_val;->c; repeat,t,<-c; +if,else;(
-    if,else>->repeat.
-    <-if;->_set_tt;->t.
-    <-else;->t.
-  )
-
-  ! Same as _set_tt but for false
-  ack<<_set_ff;->ack; c<-_val;->c; repeat,,f<-c; +if,else;(
-    if,else>->repeat.
-    <-if;->_set_ff;->f.
-    <-else;->f.
-  )
-
-  ! Override current _val listener with new switch value.
-  ready<<set_tt; ff,,>->_val; ready->_set_tt.
-  ready<<set_ff; ff,,>->_val; ready->_set_ff.
-
-  ! Public value request channel (repeats current value after each request)
-  c<<value;->c; t,f<-c; tt,t,f>->_val.
-)
-
-! Switch using a cell.
+! Boolean cell
 c<<bool; get,set<-<cell; +set_tt,set_ff,value;(
   ! Set to true initially.
   <>set_tt; set_tt,set_ff,value->c.
 
   ! Setters
-  ready<<set_tt; +a;a->set;<-a; tt->a;<-a; ->ready.
-  ready<<set_ff; +a;a->set;<-a; ff->a;<-a; ->ready.
+  ack<<set_tt; tt,ack>->set.
+  ack<<set_ff; ff,ack>->set.
 
   ! Getter
-  c<<value;->c; t,f<-c; x<-<get; t,f>->x.
+  t,f<<<value; x<-<get; t,f>->x.
 )
