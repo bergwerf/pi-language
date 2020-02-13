@@ -28,10 +28,10 @@ xy<<add; x,y<-xy; +n;(
 ! Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
 
 ! Read unary number from stdin.
-sync<<read_unary; +c;c->stack; push,pop,ready<-c; <-ready; 0->push; +n;(
+r<<read_unary; +c;c->stack; push,pop<-c; +c;c->push;<-c; 0->c; <-c; +n;(
   ->stdin_read.
-  <-stdin__0; +top;top->pop; ,n<-top; n->sync.
-  <<stdin__1; +top;top->pop; ,n<-top; +do;(
+  <-stdin__0; +top;top->pop; ,n<-top; n->r.
+  <<stdin__1; +top;top->pop; empty,n<-top; +do;(
     +b;b->empty;<-b; do,->b.
     <-do; +c;c->add; n,1->c; m<-c; +c;c->push;(
       m->c.
@@ -44,7 +44,7 @@ sync<<read_unary; +c;c->stack; push,pop,ready<-c; <-ready; 0->push; +n;(
 n<<write_unary; +c;(
   c->n.
   a,z<-c;(
-    t<<a; t->stdout_1.
-    t<-z; t->stdout_0.
+    t<<a; t->stdout__1.
+    t<-z; t->stdout__0.
   )
 )

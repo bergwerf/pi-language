@@ -14,7 +14,7 @@ r<<stack; +push,pop,_pop,peek;(
   )
 
   ! Push item
-  a<<push; x<-a; +c;c->_pop; ff->c; _,_,prev<-c; +item;(
+  a<<push;->a; x<-a; +c;c->_pop; ff->c; _,_,prev<-c; +item;(
     +ack;ack->item;<-ack; ->a.
     ack<<item;->ack; c<-_pop; cascade<-c; +if,else,finish;(
       +b;b->cascade;<-b; if,else->b.

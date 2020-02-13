@@ -14,7 +14,7 @@ func main() {
 	stdin = os.Stdin
 
 	// Parse all files given by the command line arguments.
-	program := make([]*Process, 0)
+	tokens := make([]Token, 0)
 	stack := make([]string, 0) // File reading stack
 	global := MakeSet()        // Global names
 	loaded := MakeSet()        // Already parsed files
@@ -38,9 +38,9 @@ func main() {
 		loaded.Add(path)
 
 		// Try to read file.
-		bytes, ioErr := ioutil.ReadFile(path)
-		if ioErr != nil {
-			panic(ioErr)
+		bytes, err := ioutil.ReadFile(path)
+		if err != nil {
+			panic(err)
 		}
 
 		// Extract directives.
@@ -53,27 +53,25 @@ func main() {
 			stack = append(stack, abs)
 		}
 
-		// Try to parse.
-		proc, parseErr := Parse(source, Loc{path, offset + 1, 0})
-		program = append(program, proc...)
-		if len(parseErr) != 0 {
-			for _, e := range parseErr {
-				println(e.Error())
-			}
-			panic(fmt.Sprintf("Terminated because \"%v\" contains errors.", path))
-		}
+		// Add tokens in this file.
+		tokens = append(tokens, Tokenize(source, Loc{path, offset + 1, 0}, true)...)
 	}
 
 	// Wrap all processes in globally defined names.
-	if len(global) > 0 {
-		program = []*Process{
-			&Process{Loc{}, ASTCreate, nil, global.ToSlice(), program}}
+	full := make([]Token, 0, len(tokens)+2*len(global)+2)
+	for v := range global {
+		full = append(full, Token{Loc{}, fmt.Sprintf("+%v", v)}, Token{Loc{}, ";"})
 	}
+	full = append(full, Token{Loc{}, "("})
+	full = append(full, tokens...)
+	full = append(full, Token{Loc{}, ")"})
 
 	// Process program.
-	err := errorList([]error{})
-	proc := ProcessProgram(program, uint(0), nil, &err)
-	if len(err) != 0 {
+	err := ErrorList([]error{})
+	proc, remainder := Parse(full, uint(0), copyMap(nil), &err)
+	if len(remainder) > 0 {
+		fmt.Printf("%v tokens were not parsed", len(remainder))
+	} else if len(err) != 0 {
 		for _, e := range err {
 			println(e.Error())
 		}

@@ -1,23 +1,10 @@
 package main
 
-import "container/list"
-
-// Create a deep copy of a string to uint map.
-func copyMap(m map[string]uint) map[string]uint {
-	n := make(map[string]uint, len(m))
-	for k, v := range m {
-		n[k] = v
-	}
-	return n
-}
-
-// Ternary operator replacement for choosing an integer.
-func pick(takeX bool, x int, y int) int {
-	if takeX {
-		return x
-	}
-	return y
-}
+import (
+	"container/list"
+	"fmt"
+	"path/filepath"
+)
 
 // ListUnion merges the second list into the first list while retaining order.
 func ListUnion(dst *list.List, src *list.List) {
@@ -36,6 +23,15 @@ func ListUnion(dst *list.List, src *list.List) {
 			dst.InsertBefore(v2, e1)
 		}
 	}
+}
+
+// Create a deep copy of a string to uint map.
+func copyMap(m map[string]uint) map[string]uint {
+	n := make(map[string]uint, len(m))
+	for k, v := range m {
+		n[k] = v
+	}
+	return n
 }
 
 // Convert list to uint slice.
@@ -60,6 +56,19 @@ func assert(condition bool) {
 	if !condition {
 		panic("failed assertion")
 	}
+}
+
+// Loc contains a file location.
+type Loc struct {
+	Path    string
+	Ln, Col int
+}
+
+func (l Loc) String() string {
+	if len(l.Path) == 0 {
+		return "<internal>"
+	}
+	return fmt.Sprintf("%v:%v:%v", filepath.Base(l.Path), l.Ln, l.Col)
 }
 
 // Set is a hash set using a map.

@@ -56,7 +56,7 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 		for len(queue) > 0 {
 			var node Node
 			node, queue = queue[0], queue[1:]
-			switch node.Proc.Type {
+			switch node.Proc.Action {
 			case PINewRef:
 				assert(len(node.Refs) == int(node.Proc.Channel.Value))
 				refs := copyAppend(node.Refs, channels)
@@ -142,7 +142,7 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 					}
 
 					// Remove PISubsOne subscription.
-					if node.Proc.Type == PISubsOne {
+					if node.Proc.Action == PISubsOne {
 						subs.Remove(n)
 					}
 				}
@@ -213,7 +213,7 @@ func printDebugInfo(sub map[uint]*list.List, channel uint) {
 	if subs, nonEmpty := sub[channel]; nonEmpty && subs.Len() > 0 {
 		for n := subs.Front(); n != nil; n = n.Next() {
 			node := n.Value.(Node)
-			fmt.Printf("+ %v\n", node.Proc.Loc)
+			fmt.Printf("+ %v\n", node.Proc.Location)
 		}
 	}
 	println("---------------------")
