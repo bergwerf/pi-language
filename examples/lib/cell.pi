@@ -11,7 +11,7 @@ c<<cell; +get,set,_get,_set;(
   ! Start new _get cycle.
   a<<_set;->a; x<-a;(->a.
     r<-_get;->r; reset<-r; +if,else;(
-      +b;b->reset;<-b; if,else->b.
+      if,else>->reset.
       <-if; +a;a->_set;<-a; x->a;<-a; x->r.
       <-else; x->r.
     )

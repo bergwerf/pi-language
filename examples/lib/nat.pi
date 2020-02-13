@@ -7,44 +7,44 @@
 #global: read_unary
 #global: write_unary
 
-! We attach a process to n that acts as a zero encoding; when a channel r is
-! sent to n, it will receive channel a (accumulator) and z (zero) over which
-! the number value is transmitted.
-n<<0;r<<n; +a,z; a,z->r;<-r; +x;x->z.
-n<<1;r<<n; +a,z; a,z->r;<-r; +x;x->a;x->z.
+! Numbers have a counter interface with a step channel and a zero channel which
+! will return ff or tt (if it is the last step).
+c<<0; +step,zero; step,zero->c; <-step;tt->zero.
+c<<1; +step,zero; step,zero->c; <-step;ff->zero; <-step;tt->zero.
 
 ! Addition of two encoded numbers.
-xy<<add; x,y<-xy; +n;(
-  n->xy.
-  r<<n; +a,z; a,z->r;<-r; +r_x,r_y,z_xy;(
-    r_x->x.
-    r_y->y.
-    a_x,z_x<-r_x;->r_x; (t<<a_x;t->a. t<-z_x;t->z_xy.)
-    a_y,z_y<-r_y;->r_y; (t<<a_y;t->a. t<-z_y;t->z_xy.)
-    t,t<-z_xy;t->z.
-  )
-)
+xy<<add;->xy; x,y<-xy; ,next,stage<-<bool; +n;n->xy;
+  c<<n; sx,zx<-<x; sy,zy<-<y; +step,zero; step,zero->c;
+    <<step; +use_x,use_y;(
+      use_x,use_y>->stage.
+      <-use_x; ->sx; is_zero<-zx; +t,f;(
+        t,f>->is_zero.
+        <-t; <>next; ->step.
+        <-f; ff->zero.
+      )
+      <-use_y; ->sy; is_zero<-zy; +t,f;(
+        t,f>->is_zero.
+        <-t; tt->zero.
+        <-f; ff->zero.
+      )
+    )
 
 ! Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
 
 ! Read unary number from stdin.
-r<<read_unary; +c;c->stack; push,pop<-c; +c;c->push;<-c; 0->c; <-c; +n;(
+r<<read_unary; push,pop<-<stack; <-[0>->push];(
   ->stdin_read.
-  <-stdin__0; +top;top->pop; ,n<-top; n->r.
-  <<stdin__1; +top;top->pop; empty,n<-top; +do;(
-    +b;b->empty;<-b; do,->b.
-    <-do; +c;c->add; n,1->c; m<-c; +c;c->push;(
-      m->c.
-      ready<-c; <-ready; ->stdin_read.
-    )
+  <-stdin__0; empty,n<-<pop; n->r.
+  <<stdin__1; empty,n<-<pop; +next;(
+    ,next>->empty.
+    <-next; m<-[n,1>->add]; <-[m>->push]; ->stdin_read.
   )
 )
 
 ! Write unary number to stdout.
-n<<write_unary; +c;(
-  c->n.
-  a,z<-c;(
-    t<<a; t->stdout__1.
-    t<-z; t->stdout__0.
+n<<write_unary; step,zero<-<n; ->step;
+  is_zero<<zero; +t,f;(
+    t,f>->is_zero.
+    <-t; ->stdout__0;<-stdout_write; ->stdout_0A.
+    <-f; ->stdout__1;<-stdout_write; ->step.
   )
-)

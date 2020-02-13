@@ -66,14 +66,6 @@ func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
 					queue = append(queue, Node{p, refs, seqs})
 				}
 
-			case PIPopRef:
-				assert(len(node.Refs)-1 == int(node.Proc.Channel.Value))
-				refs := node.Refs[:len(node.Refs)-1]
-				seqs := node.Seqs[:len(node.Seqs)-1]
-				for _, p := range node.Proc.Children {
-					queue = append(queue, Node{p, refs, seqs})
-				}
-
 			case PISubsOne:
 				fallthrough
 			case PISubsAll:

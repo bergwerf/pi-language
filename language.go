@@ -13,8 +13,8 @@ const (
 	sSemicolon = ";"
 	sPeriod    = "."
 	control    = "[(;.)]"
-	name       = "\\s*([a-zA-Z0-9_]+)\\s*"
-	argument   = "([\\sa-zA-Z0-9_,]*)"
+	name       = "\\s*([a-zA-Z0-9_@]+)\\s*"
+	argument   = "([\\sa-zA-Z0-9_@,]*)"
 	nameCan    = "([a-zA-Z0-9_@]+)"
 )
 
@@ -25,7 +25,6 @@ var (
 // Core language
 const (
 	PINewRef = iota
-	PIPopRef
 	PISubsOne
 	PISubsAll
 	PISend
@@ -35,7 +34,7 @@ const (
 type Proc struct {
 	Location Loc
 	Action   int
-	Channel  Var     // Variable of new/popped or receive/send channel
+	Channel  Var     // Variable of new or receive/send channel
 	Message  Var     // Variable of receive/send message
 	Children []*Proc // Child processes (parallel)
 }
@@ -43,13 +42,13 @@ type Proc struct {
 // Core syntax.
 var coreSyntax = []Transform{
 	trans("\\+%v", 1, func(loc Loc, v []Var) *Proc { return &Proc{loc, PINewRef, v[0], Var{}, nil} }, nameCan),
-	trans("\\~%v", 0, func(loc Loc, v []Var) *Proc { return &Proc{loc, PIPopRef, v[0], Var{}, nil} }, nameCan),
 	trans("%v<-%v", 1, func(loc Loc, v []Var) *Proc { return &Proc{loc, PISubsOne, v[1], v[0], nil} }, nameCan, nameCan),
 	trans("%v<<%v", 1, func(loc Loc, v []Var) *Proc { return &Proc{loc, PISubsAll, v[1], v[0], nil} }, nameCan, nameCan),
 	trans("%v->%v", 0, func(loc Loc, v []Var) *Proc { return &Proc{loc, PISend, v[1], v[0], nil} }, nameCan, nameCan),
 }
 
-// Rewrites to convert PI source code to a normal form.
+// Rewrites to convert PI source code to a normal form. To avoid collisions
+// each rewrite should use a unique new fresh variable (@n).
 var extendedSyntax = []Rewrite{
 	// Remove comments.
 	rw("!.*", ""),
@@ -66,23 +65,29 @@ var extendedSyntax = []Rewrite{
 	// Variadic send RHS: a->b,c === a->b;a->c
 	rw("%v->%v,%v", "%[1]v->%[2]v;%[1]v->%[3]v", argument, argument, argument),
 
-	// Wait for trigger: <-x === @<-x;~@
-	rw("<-%v", "@<-%[1]v;~@", name),
+	// Wait for trigger: <-x === @<-x
+	rw("<-%v", "@1<-%[1]v", name),
 
-	// Receive all triggers: <<x === @<<x;~@
-	rw("<<%v", "@<<%[1]v;~@", name),
+	// Receive all triggers: <<x === @<<x
+	rw("<<%v", "@2<<%[1]v", name),
 
-	// Trigger once: ->x === +@;@->x;~@
-	rw("->%v", "+@;@->%[1]v;~@", name),
+	// Trigger once: ->x === +@;@->x
+	rw("->%v", "+@3;@3->%[1]v", name),
 
-	// Trigger and wait: <>x === +@;@->x;<-@;~@
-	rw("<>%v", "+@;@->%[1]v;<-@;~@", name),
+	// Trigger and wait: <>x === +@;@->x;<-@
+	rw("<>%v", "+@4;@4->%[1]v;<-@4", name),
 
-	// Tunnel arguments: y=>x === +@;@->x;<-@;y->@;~@
-	rw("%v=>%v", "+@;@->%[2]v;<-@;%[1]v->@;~@", argument, name),
+	// Send tunnel: y>->x === +@;@->x;<-@;y->@
+	rw("%v>->%v", "+@5;@5->%[2]v;<-@5;%[1]v->@5", argument, name),
 
-	// Forward channel: x>>y === @<<x;@->y;~@
-	rw("%v>>%v", "@<<%[1]v;@->%[2]v;~@", name, argument),
+	// Receive tunnel: y<-<x === +@;@->x;y<-@
+	rw("%v<-<%v", "+@6;@6->%[2]v;%[1]v<-@6", argument, name),
+
+	// Send and receive tunnel: z<-[y>->x] === +@;@->x;<-@;y->@;z<-@
+	rw("%v<-\\[%v>->%v\\]", "+@7;@7->%[3]v;<-@7;%[2]v->@7;%[1]v<-@7", argument, argument, name),
+
+	// Forward to channel: x>>y === @<<x;@->y
+	rw("%v>>%v", "@8<<%[1]v;@8->%[2]v", name, argument),
 }
 
 // Interface channels

@@ -23,7 +23,7 @@ func Parse(tokens []Token, refCount uint, bound map[string]uint, err *ErrorList)
 			tokens = remainder
 			if len(tokens) == 0 {
 				err.Add(fmt.Errorf("%v; missing closing parenthesis", loc))
-				break
+				return proc, nil
 			}
 		}
 		return proc, tokens[1:]
@@ -50,13 +50,8 @@ func Parse(tokens []Token, refCount uint, bound map[string]uint, err *ErrorList)
 				}
 			}
 
-			// Build process and decrement reference count after a PIPopRef.
-			proc := trans.Process(loc, v)
-			if proc.Action == PIPopRef {
-				refCount--
-			}
-
 			// Next we expect a ; or .
+			proc := trans.Process(loc, v)
 			tokens = tokens[1:]
 			if len(tokens) == 0 {
 				err.Add(fmt.Errorf("%v; expected semicolon or period", loc))

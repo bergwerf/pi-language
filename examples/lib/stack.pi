@@ -4,9 +4,9 @@
 r<<stack; +push,pop,_pop,peek;(
   ! Empty item
   +bottom;(
-    +init;init->bottom;<-init; push,pop,peek->r.
-    ack<<bottom;->ack; c<-_pop; cascade<-c; +if,else,finish;(
-      +b;b->cascade;<-b; tt,ff->b.
+    <>bottom; push,pop,peek->r.
+    ack<<bottom;->ack; c<-_pop;->c; cascade<-c; +if,else,finish;(
+      if,else>->cascade.
       <-if; finish->bottom.
       <-else; ->finish.
       <-finish; tt,c,bottom->c.
@@ -14,9 +14,9 @@ r<<stack; +push,pop,_pop,peek;(
   )
 
   ! Push item
-  a<<push;->a; x<-a; +c;c->_pop; ff->c; _,_,prev<-c; +item;(
-    +ack;ack->item;<-ack; ->a.
-    ack<<item;->ack; c<-_pop; cascade<-c; +if,else,finish;(
+  a<<push;->a; x<-a; +c;c->_pop;<-c; ff->c; ,,prev<-c; +item;(
+    a->item.
+    ack<<item;->ack; c<-_pop;->c; cascade<-c; +if,else,finish;(
       +b;b->cascade;<-b; if,else->b.
       <-if; finish->prev.
       <-else; ->finish.
@@ -25,8 +25,8 @@ r<<stack; +push,pop,_pop,peek;(
   )
 
   ! Pop item
-  c<<pop; +cc;cc->_pop; tt->cc; empty,x<-cc; empty,x->c.
+  c<<pop; empty,x<-[tt>->_pop]; empty,x->c.
 
   ! Peek at top item
-  c<<peek; +cc;cc->_pop; ff->cc; _,x,item<-cc; +ack;ack->item;<-ack; x->c.
+  c<<peek; ,x,item<-[ff>->_pop]; <>item; x->c.
 )

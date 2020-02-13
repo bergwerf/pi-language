@@ -1,0 +1,5 @@
+! Add unary encoded numbers. For example 10110 outputs 1110.
+
+#attach: lib/nat.pi
+
+x<-<read_unary; y<-<read_unary; z<-[x,y>->add]; z->write_unary.

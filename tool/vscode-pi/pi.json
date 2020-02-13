@@ -18,11 +18,7 @@
     },
     {
       "name": "keyword.operator",
-      "match": "->|\\+|<<|<-"
-    },
-    {
-      "name": "keyword.operator",
-      "match": "=>|<>"
+      "match": "\\+|<-<?|<<|>?->|<>"
     },
     {
       "name": "keyword.other",
