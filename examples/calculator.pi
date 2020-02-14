@@ -1,0 +1,21 @@
+! Calculator with unary number input and support for addition and
+! multiplication. The result is cumlative. For example:
+! 110+10*1110+10 --> 11111111110
+
+#attach: lib/nat.pi
+#attach: lib/cell.pi
+
+get,set<-<cell; n<-<read_unary; +ack; n,ack>->set; <-ack; +loop;+compute;(
+  ->loop.
+  op<<compute;
+    n<-<get; m<-<read_unary;
+    +ret; n,m,ret>->op; k<-ret;
+    +ack; k,ack>->set; <-ack;
+    ->loop.
+  <<loop; (
+    ->stdin_read.
+    <-stdin_2B; add->compute. ! +
+    <-stdin_2A; mul->compute. ! *
+    <-stdin_EOF; n<-<get; n->write_unary.
+  )
+)

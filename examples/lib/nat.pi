@@ -4,6 +4,7 @@
 #global: 0
 #global: 1
 #global: add
+#global: mul
 #global: read_unary
 #global: write_unary
 
@@ -13,19 +14,32 @@ c<<0; +step,zero->c; <-step;tt->zero.
 c<<1; +step,zero->c; <-step;ff->zero; <-step;tt->zero.
 
 ! Addition of two encoded numbers.
-x,y,ret<<<add; +n->ret;
-c<<n; sx,zx<-<x; sy,zy<-<y; ,next,stage<-<bool; +step,zero->c;
-<<step; +use_x,use_y;(
-  use_x,use_y>->stage.
-  <-use_x; ->sx; is_zero<-zx; +t,f;(
+n,m,ret<<<add; +k->ret;
+c<<k; ns,nz<-<n; ms,mz<-<m; ,next,stage<-<bool; +step,zero->c;
+<<step; +use_n,use_m;(
+  use_n,use_m>->stage.
+  <-use_n; ->ns; is_zero<-nz; +t,f;(
     t,f>->is_zero.
     <-t; <>next; ->step.
     <-f; ff->zero.
   )
-  <-use_y; ->sy; is_zero<-zy; +t,f;(
+  <-use_m; ->ms; is_zero<-mz; +t,f;(
     t,f>->is_zero.
     <-t; tt->zero.
     <-f; ff->zero.
+  )
+)
+
+! Multiplication of two encoded numbers.
+n,m,ret<<<mul; get,set<-<cell; +ack; 0,ack>->set; <-ack; ns,nz<-<n; +loop;(
+  ->loop.
+  <<loop; acc<-<get; ->ns; is_zero<-nz; +return,add_m;(
+    return,add_m>->is_zero.
+    <-return; acc->ret.
+    <-add_m;
+      +ret; acc,m,ret>->add; acc<-ret;
+      +ack; acc,ack>->set; <-ack;
+      ->loop.
   )
 )
 

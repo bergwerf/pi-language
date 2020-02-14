@@ -23,5 +23,5 @@ c<<cell; +get,set,_get,_set;(
   t<<set; +ret; ff,ret>->_get; <-ret; t->_set.
 
   ! Get current value.
-  c<<get; tt,c>->_get.
+  ret<<get; tt,ret>->_get.
 )
