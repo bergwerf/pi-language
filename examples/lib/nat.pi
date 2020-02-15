@@ -127,6 +127,6 @@ ret<<read_unary; ,finish,active<-<bool; n,inc<-<counter;(
 n,ready<<<write_unary; step,zero<-<n; ->step;
   is_zero<<zero; +t,f;(
     t,f>->is_zero.
-    <-t; ->stdout__0;<-stdout_write; ->ready.
-    <-f; ->stdout__1;<-stdout_write; ->step.
+    <-t; <>stdout__0; ->ready.
+    <-f; <>stdout__1; ->step.
   )

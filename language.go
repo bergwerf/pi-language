@@ -33,18 +33,18 @@ const (
 // Proc is a PI process.
 type Proc struct {
 	Location Loc
-	Action   int
-	Channel  Var     // Variable of new or receive/send channel
-	Message  Var     // Variable of receive/send message
+	Command  int
+	Channel  uint    // Variable of new or receive/send channel
+	Message  uint    // Variable of receive/send message
 	Children []*Proc // Child processes (parallel)
 }
 
 // Core syntax.
 var coreSyntax = []Transform{
-	trans("\\+%v", 1, func(loc Loc, v []Var) *Proc { return &Proc{loc, PINewRef, v[0], Var{}, nil} }, nameCan),
-	trans("%v<-%v", 1, func(loc Loc, v []Var) *Proc { return &Proc{loc, PISubsOne, v[1], v[0], nil} }, nameCan, nameCan),
-	trans("%v<<%v", 1, func(loc Loc, v []Var) *Proc { return &Proc{loc, PISubsAll, v[1], v[0], nil} }, nameCan, nameCan),
-	trans("%v->%v", 0, func(loc Loc, v []Var) *Proc { return &Proc{loc, PISend, v[1], v[0], nil} }, nameCan, nameCan),
+	trans("\\+%v", 1, func(loc Loc, v []uint) *Proc { return &Proc{loc, PINewRef, v[0], 0, nil} }, nameCan),
+	trans("%v<-%v", 1, func(loc Loc, v []uint) *Proc { return &Proc{loc, PISubsOne, v[1], v[0], nil} }, nameCan, nameCan),
+	trans("%v<<%v", 1, func(loc Loc, v []uint) *Proc { return &Proc{loc, PISubsAll, v[1], v[0], nil} }, nameCan, nameCan),
+	trans("%v->%v", 0, func(loc Loc, v []uint) *Proc { return &Proc{loc, PISend, v[1], v[0], nil} }, nameCan, nameCan),
 }
 
 // Rewrites to convert PI source code to a normal form. To avoid collisions
@@ -90,7 +90,7 @@ var extendedSyntax = []Rewrite{
 	// 3. Sending a tunnel to send or receive a stream.
 
 	// Send through tunnel: y>->x === +@;@->x;<-@;y->@
-	rw("%v>->%v", "+@6;@6->%[2]v;<-@6;%[1]v->@6", argument, name),
+	rw("%v>->%v", "+@6a;@6a->%[2]v;@6b<-@6a;%[1]v->@6b", argument, name),
 
 	// Receive through tunnel: y<-<x === +@;@->x;y<-@
 	rw("%v<-<%v", "+@7;@7->%[2]v;%[1]v<-@7", argument, name),
@@ -98,36 +98,35 @@ var extendedSyntax = []Rewrite{
 	// 4. Receiving a tunnel to send or receive a stream.
 
 	// Tunneled receive one: y<<-x === @<-x;->@;y<-@
-	rw("%v<<-%v", "@8<-%[2]v;->@8;%[1]v<-@8", argument, name),
+	rw("%v<<-%v", "@8a<-%[2]v;+@8b->@8a;%[1]v<-@8b", argument, name),
 
 	// Tunneled receive all: y<<<x === @<<x;->@;y<-@
-	rw("%v<<<%v", "@9<<%[2]v;->@9;%[1]v<-@9", argument, name),
+	rw("%v<<<%v", "@9a<<%[2]v;+@9b->@9a;%[1]v<-@9b", argument, name),
 }
 
-// Interface channels
+// IO channels
 var (
 	// 0..255
 	stdinHexRE, _      = regexp.Compile("^stdin_([0-9A-F]{2})$")
 	stdinAlphaNumRE, _ = regexp.Compile("^stdin__([a-zA-Z0-9])$")
 
 	// 256..511
-	stdoutIDOffset      = uint(256)
+	stdoutOffset        = uint(256)
 	stdoutHexRE, _      = regexp.Compile("^stdout_([0-9A-F]{2})$")
 	stdoutAlphaNumRE, _ = regexp.Compile("^stdout__([a-zA-Z0-9])$")
 
 	// Other channels
-	specialChannels = map[string]uint{
-		"stdin_read":   uint(512),
-		"stdin_EOF":    uint(513),
-		"stdout_write": uint(514),
-		"DEBUG":        uint(515),
+	miscIOChannels = map[string]uint{
+		"stdin_EOF":  513,
+		"stdin_read": 512,
+		"DEBUG":      514,
 	}
 
-	reservedChannelIDs = uint(516)
+	ioChannelOffset = uint(515)
 )
 
 // BuildProc builds a process.
-type BuildProc func(Loc, []Var) *Proc
+type BuildProc func(Loc, []uint) *Proc
 
 // Rewrite is a regular expression based string rewrite.
 type Rewrite struct {
@@ -156,20 +155,4 @@ func trans(format string, bind int, build BuildProc, types ...interface{}) Trans
 	typedFmt := fmt.Sprintf(prefixFmt, types...)
 	re, _ := regexp.Compile(typedFmt)
 	return Transform{re, bind, build}
-}
-
-// Var represents a variable. Raw variables are used to represent unbounded
-// interface channels (input/output). This is an optimization.
-type Var struct {
-	Raw   bool
-	Value uint
-	Name  string
-}
-
-// ID returns the ID this variable is bound to on the given node.
-func (v Var) ID(node Node) uint {
-	if v.Raw {
-		return v.Value
-	}
-	return node.Refs[v.Value]
 }

@@ -7,51 +7,53 @@ import (
 
 // Pi represents the state of a Pi program.
 type Pi struct {
-	Queue        []Node
-	Ether        []Message
-	Network      map[uint]*Channel
-	CycleCount   uint64
-	ChannelCount uint
-}
-
-// Node represents a process with a number of bound channels. This follows the
-// signalling network metaphor. A process is a pointer from the program AST.
-type Node struct {
-	Proc *Proc  // Process at which this node is paused
-	Refs []uint // Allocated variable IDs (including out of scope ones)
-	Seqs []uint // Sequence number of last sent message on each channel
-}
-
-// Message represents a single message.
-type Message struct {
-	Seq       uint
-	ChannelID uint
-	ContentID uint
+	Cycle uint64
+	Queue []Node
+	Ether []Message
+	Stdio []*Channel
 }
 
 // Channel holds channel and subscription information.
 type Channel struct {
-	Seq       uint
-	Listeners []Node
-	PrevCycle uint64
+	IOIndex   int    // -1 or IO channel index
+	Listeners []Node // Current channel listeners
+	PrevCycle uint64 // Previous cycle in which a message was delivered
 }
 
-// Schedule adds processes to the queue with the provided context.
-func (pi *Pi) Schedule(proc []*Proc, refs []uint, seqs []uint) {
-	for _, p := range proc {
-		pi.Queue = append(pi.Queue, Node{p, refs, seqs})
+// Node represents a process with a number of bound channels. This follows the
+// signalling network metaphor. A process is a pointer to the program AST.
+type Node struct {
+	Proc *Proc      // Process at which this node is paused
+	Refs []*Channel // Referenced channels
+}
+
+// Message represents a single message.
+type Message struct {
+	Channel *Channel
+	Content *Channel
+}
+
+// Schedule adds child processes to the queue with the provided references.
+func (pi *Pi) Schedule(proc []*Proc, refs []*Channel) {
+	// Make sure each process gets a copy of the references such that they can
+	// modify the references in place without interferring with other processes.
+	for i, p := range proc {
+		if i == 0 {
+			pi.Queue = append(pi.Queue, Node{p, refs})
+		} else {
+			pi.Queue = append(pi.Queue, Node{p, copyRefs(refs)})
+		}
 	}
 }
 
 // Initialize sets up the initial program state.
 func (pi *Pi) Initialize(proc []*Proc) {
-	pi.Schedule(proc, nil, nil)
-
-	// Add all interface channels to the network.
-	for pi.ChannelCount < reservedChannelIDs {
-		pi.Network[pi.ChannelCount] = &Channel{0, nil, 0}
-		pi.ChannelCount++
+	// Create IO channels.
+	pi.Stdio = make([]*Channel, ioChannelOffset)
+	for i := 0; i < int(ioChannelOffset); i++ {
+		pi.Stdio[i] = &Channel{i, nil, 0}
 	}
+	pi.Schedule(proc, copyRefs(pi.Stdio))
 }
 
 // RunNextNode executes the top node in the process queue.
@@ -62,128 +64,116 @@ func (pi *Pi) RunNextNode() {
 
 	var node Node
 	node, pi.Queue = pi.Queue[0], pi.Queue[1:]
-	switch node.Proc.Action {
+	switch node.Proc.Command {
 	case PINewRef:
-		//assert(len(node.Refs) == int(node.Proc.Channel.Value))
-		id := pi.ChannelCount
-		pi.ChannelCount++
-		pi.Network[id] = &Channel{0, nil, 0}
-
-		refs := copyAppend(node.Refs, id)
-		seqs := copyAppend(node.Seqs, 0)
-		pi.Schedule(node.Proc.Children, refs, seqs)
+		assert(len(node.Refs) == int(node.Proc.Channel))
+		refs := append(node.Refs, &Channel{-1, nil, 0})
+		pi.Schedule(node.Proc.Children, refs)
 
 	case PISubsOne:
 		fallthrough
 	case PISubsAll:
-		channelID := node.Proc.Channel.ID(node)
-		channel := pi.Network[channelID]
+		channel := node.Refs[node.Proc.Channel]
 		channel.Listeners = append(channel.Listeners, node)
 
 	case PISend:
-		channelID := node.Proc.Channel.ID(node)
-		messageID := node.Proc.Message.ID(node)
-		seqs := node.Seqs
+		channel := node.Refs[node.Proc.Channel]
+		message := node.Refs[node.Proc.Message]
+		pi.Ether = append(pi.Ether, Message{channel, message})
+		pi.Schedule(node.Proc.Children, node.Refs)
 
-		// Messages to the debug interface channel are handled immediately. This
-		// is practical because if we wait the subscriber map may change.
-		if channelID == specialChannels["DEBUG"] {
-			printDebugInfo(messageID, pi.Network[messageID])
-		} else {
-			// Otherwise send and update sequence number for this channel. We do
-			// not set sequence numbers for interface channels.
-			channel := pi.Network[channelID]
-			channel.Seq++
-			pi.Ether = append(pi.Ether, Message{channel.Seq, channelID, messageID})
-			if !node.Proc.Channel.Raw {
-				// Deep copy the slice because the memory may be shared with
-				seqs = make([]uint, len(node.Seqs))
-				copy(seqs, node.Seqs)
-				seqs[node.Proc.Channel.Value] = channel.Seq
-			}
+		// Messages to the debug channel are handled immediately. This is practical
+		// because if we wait the listeners may change.
+		if channel.IOIndex == int(miscIOChannels["DEBUG"]) {
+			message.PrintDebugInfo()
 		}
-
-		pi.Schedule(node.Proc.Children, node.Refs, seqs)
 	}
 }
 
 // DeliverMessages delivers up to one message per channel from the ether.
 func (pi *Pi) DeliverMessages(input io.Reader, output io.Writer) {
-	pi.CycleCount++
+	pi.Cycle++
 	messages := pi.Ether
 	pi.Ether = pi.Ether[0:0]
 
 	for _, m := range messages {
-		channel := pi.Network[m.ChannelID]
-
-		// Check if we already delivered a message to this channel in this cycle.
-		if channel.PrevCycle == pi.CycleCount {
+		// Check if we can send a message on this channel in the current cycle. We
+		// send only one message per channel per cycle!
+		if m.Channel.PrevCycle < pi.Cycle {
+			m.Channel.PrevCycle = pi.Cycle
+		} else {
+			// Put message back into the ether.
 			pi.Ether = append(pi.Ether, m)
 			continue
 		}
 
-		channel.PrevCycle = pi.CycleCount
-		listeners := channel.Listeners
-		channel.Listeners = channel.Listeners[0:0]
-		for _, n := range listeners {
-			//assert(n.Proc.Channel.ID(n) == m.ChannelID)
-			//assert(len(n.Refs) == int(n.Proc.Message.Value))
+		listeners := m.Channel.Listeners
+		m.Channel.Listeners = m.Channel.Listeners[0:0]
+		for _, node := range listeners {
+			assert(len(node.Refs) == int(node.Proc.Message))
 
-			// Check if this message is after the node specific channel sequence. If
-			// not put the listener back.
-			if !n.Proc.Channel.Raw && m.Seq <= n.Seqs[n.Proc.Channel.Value] {
-				channel.Listeners = append(channel.Listeners, n)
-				continue
+			// Copy references of a PISubsAll subscription and renew subscription.
+			refs := node.Refs
+			if node.Proc.Command == PISubsAll {
+				refs = copyRefs(node.Refs)
+				m.Channel.Listeners = append(m.Channel.Listeners, node)
 			}
 
 			// Append message content to references and queue child processes.
-			refs := copyAppend(n.Refs, m.ContentID)
-			seqs := copyAppend(n.Seqs, 0)
-			pi.Schedule(n.Proc.Children, refs, seqs)
-
-			// Renew PISubsAll subscription.
-			if n.Proc.Action == PISubsAll {
-				channel.Listeners = append(channel.Listeners, n)
-			}
+			refs = append(refs, m.Content)
+			pi.Schedule(node.Proc.Children, refs)
 		}
 
-		// Handle interface messages. Note that the way we iterate and overwrite
-		// the ether buffer at the same time is only ok as long as this function
-		// returns at most one message.
-		pi.Ether = append(pi.Ether, handleInterfaceMessage(input, output, m)...)
+		// Handle IO messages. Note that the way we iterate and overwrite the ether
+		// buffer at the same time is only ok as long as this function returns at
+		// most one message.
+		if m.Channel.IOIndex != -1 {
+			ioMessages := handleStdioMessage(pi.Stdio, input, output, m)
+			pi.Ether = append(pi.Ether, ioMessages...)
+		}
 	}
 }
 
-func handleInterfaceMessage(in io.Reader, out io.Writer, m Message) []Message {
+func handleStdioMessage(stdio []*Channel, in io.Reader, out io.Writer, m Message) []Message {
 	// + Standard input read trigger.
 	// + Standard output byte trigger.
 	// + Debug info channel.
-	id := m.ChannelID
-	if id == specialChannels["stdin_read"] {
+	id := uint(m.Channel.IOIndex)
+	if id == miscIOChannels["stdin_read"] {
 		// Wait for next byte (or EOF)
 		buf := make([]byte, 1)
 		if _, err := in.Read(buf); err == nil {
 			// Send byte read trigger.
-			return []Message{Message{0, uint(buf[0]), m.ContentID}}
+			byteReadChannel := stdio[buf[0]]
+			return []Message{Message{byteReadChannel, m.Content}}
 		} else if err == io.EOF {
 			// Send EOF trigger.
-			return []Message{Message{0, specialChannels["stdin_EOF"], m.ContentID}}
+			eofChannel := stdio[miscIOChannels["stdin_EOF"]]
+			return []Message{Message{eofChannel, m.Content}}
 		}
-	} else if stdoutIDOffset <= id && id < stdoutIDOffset+256 {
-		// Write byte to stdout and send write trigger.
-		b := byte(id - stdoutIDOffset)
+	} else if stdoutOffset <= id && id < stdoutOffset+256 {
+		// Write byte to stdout and send acknowledgement message.
+		b := byte(id - stdoutOffset)
 		out.Write([]byte{b})
-		return []Message{Message{0, specialChannels["stdout_write"], m.ContentID}}
+		return []Message{Message{m.Content, m.Content}}
 	}
 	return nil
 }
 
-func printDebugInfo(channelID uint, channel *Channel) {
+// PrintDebugInfo prints the listeners.
+func (c *Channel) PrintDebugInfo() {
 	println()
 	println("--- DEBUG SECTION ---")
-	fmt.Printf("channel: %v\n", channelID)
-	for _, node := range channel.Listeners {
+	fmt.Printf("channel address: %p\n", c)
+	for _, node := range c.Listeners {
 		fmt.Printf("+ %v\n", node.Proc.Location)
 	}
 	println("---------------------")
+}
+
+func copyRefs(src []*Channel) []*Channel {
+	// 7 is arbitrary, but we add a bit of extra capacity to future appends.
+	dst := make([]*Channel, len(src), len(src)+7)
+	copy(dst, src)
+	return dst
 }

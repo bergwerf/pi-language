@@ -11,7 +11,7 @@ set_tt,set_ff,value<-<bool;(
   <<stdin__F; <>set_ff; ->stdin_read.
   <<stdin__O; +tt,ff;(
     tt,ff>->value.
-    <-tt;->stdout__T;<-stdout_write;->stdin_read.
-    <-ff;->stdout__F;<-stdout_write;->stdin_read.
+    <-tt; <>stdout__T; ->stdin_read.
+    <-ff; <>stdout__F; ->stdin_read.
   )
 )

@@ -15,20 +15,10 @@ Hello, World!
 -------------
 ```
 ! Print "Hello, World!\n" and exit.
-->stdout__H;<-stdout_write;
-->stdout__e;<-stdout_write;
-->stdout__l;<-stdout_write;
-->stdout__l;<-stdout_write;
-->stdout__o;<-stdout_write;
-->stdout_2C;<-stdout_write;
-->stdout_20;<-stdout_write;
-->stdout__W;<-stdout_write;
-->stdout__o;<-stdout_write;
-->stdout__r;<-stdout_write;
-->stdout__l;<-stdout_write;
-->stdout__d;<-stdout_write;
-->stdout_21;<-stdout_write;
-->stdout_0A;<-stdout_write.
+<>stdout__H; <>stdout__e; <>stdout__l; <>stdout__l; <>stdout__o;
+<>stdout_2C; <>stdout_20;
+<>stdout__W; <>stdout__o; <>stdout__r; <>stdout__l; <>stdout__d;
+<>stdout_21; <>stdout_0A.
 ```
 
 Grammar
@@ -40,8 +30,8 @@ P,Q ::= +x;P | y<-x;P | y<<x;P | y->x;P | y->x. | PQ | (P)
 ```
 
 All variable names must match the regular expression `[a-zA-Z0-9_]+`. There are
-special interface channels to interact with input and output without introducing
-data types. The interface channels are:
+special IO channels to interact with input and output without introducing
+data types. The IO channels are:
 - `stdin_read` triggers a byte read.
 - `stdin_[0-9A-F]{2}` triggers when a specific byte is read.
 - `stdout_[0-9A-F]{2}` writes bytes to the standard output when triggered.

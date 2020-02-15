@@ -43,14 +43,6 @@ func toSlice(l *list.List) []uint {
 	return output
 }
 
-// Copy-append to uint slice.
-func copyAppend(a []uint, b uint) []uint {
-	c := make([]uint, len(a)+1)
-	copy(c, a)
-	c[len(c)-1] = b
-	return c
-}
-
 // Assertion shortcut
 func assert(condition bool) {
 	if !condition {

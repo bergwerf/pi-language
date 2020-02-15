@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/csv"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -69,42 +68,23 @@ func main() {
 
 	// Process program.
 	err := ErrorList([]error{})
-	proc, remainder := Parse(full, uint(0), copyMap(nil), &err)
-	if len(remainder) > 0 {
-		fmt.Printf("%v tokens were not parsed", len(remainder))
+	proc, unparsed := Parse(full, ioChannelOffset, copyMap(nil), &err)
+	if len(unparsed) > 0 {
+		fmt.Printf("%v tokens were not parsed", len(unparsed))
 	} else if len(err) != 0 {
 		for _, e := range err {
 			println(e.Error())
 		}
 	} else {
-		queueLength, etherLength, channelCount := []int{}, []int{}, []uint{}
-		pi := Pi{nil, nil, make(map[uint]*Channel), 0, 0}
+		pi := Pi{0, nil, nil, nil}
 		pi.Initialize(proc)
 
 		// Run program.
 		for len(pi.Queue)+len(pi.Ether) > 0 {
-			queueLength = append(queueLength, len(pi.Queue))
-			channelCount = append(channelCount, pi.ChannelCount)
-
 			for len(pi.Queue) > 0 {
 				pi.RunNextNode()
 			}
-
-			etherLength = append(etherLength, len(pi.Ether))
 			pi.DeliverMessages(stdin, os.Stdout)
 		}
-
-		// Write statistics to CSV file.
-		f, _ := os.Create("stats.csv")
-		w := csv.NewWriter(f)
-		w.Write([]string{"queue", "ether", "channels"})
-		for i := 0; i < len(queueLength); i++ {
-			w.Write([]string{
-				fmt.Sprintf("%v", queueLength[i]),
-				fmt.Sprintf("%v", etherLength[i]),
-				fmt.Sprintf("%v", channelCount[i]),
-			})
-		}
-		w.Flush()
 	}
 }
