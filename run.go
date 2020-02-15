@@ -83,16 +83,16 @@ func (pi *Pi) RunNextNode() {
 	case PISend:
 		channelID := node.Proc.Channel.ID(node)
 		messageID := node.Proc.Message.ID(node)
-		channel := pi.Network[channelID]
 		seqs := node.Seqs
 
 		// Messages to the debug interface channel are handled immediately. This
 		// is practical because if we wait the subscriber map may change.
 		if channelID == specialChannels["DEBUG"] {
-			printDebugInfo(channelID, channel)
+			printDebugInfo(messageID, pi.Network[messageID])
 		} else {
 			// Otherwise send and update sequence number for this channel. We do
 			// not set sequence numbers for interface channels.
+			channel := pi.Network[channelID]
 			channel.Seq++
 			pi.Ether = append(pi.Ether, Message{channel.Seq, channelID, messageID})
 			if !node.Proc.Channel.Raw {

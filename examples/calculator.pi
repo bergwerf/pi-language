@@ -7,15 +7,25 @@
 
 get,set<-<cell; n<-<read_unary; +ack; n,ack>->set; <-ack; +loop;+compute;(
   ->loop.
+
   op<<compute;
     n<-<get; m<-<read_unary;
     +ret; n,m,ret>->op; k<-ret;
     +ack; k,ack>->set; <-ack;
     ->loop.
+
   <<loop; (
     ->stdin_read.
     <-stdin_2B; add->compute. ! +
+    <-stdin_2D; sub->compute. ! -
+    <-stdin_2F; div->compute. ! /
     <-stdin_2A; mul->compute. ! *
+    <-stdin_25; ! %
+      n<-<get; m<-<read_unary;
+      +ret; n,m,ret>->div; ,rem<-ret;
+      +ack; rem,ack>->set; <-ack;
+      ->loop.
+
     <-stdin_EOF; n<-<get; n->write_unary.
   )
 )

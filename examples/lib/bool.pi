@@ -4,9 +4,17 @@
 #global: ff
 #global: switch
 #global: bool
+#global: if2
 
-c<<tt;->c; t,f<-c;->t.
-c<<ff;->c; t,f<-c;->f.
+t,f<<<tt; ->t.
+t,f<<<ff; ->f.
+
+! If statement with two booleans and 4 branches.
+b1,b2,t_t,t_f,f_t,f_f<<<if2; +t,f;(
+  t,f>->b1.
+  <-t; t_t,t_f>->b2.
+  <-f; f_t,f_f>->b2.
+)
 
 ! Boolean cell
 c<<bool; get,set<-<cell; +set_tt,set_ff,value;(

@@ -3,17 +3,61 @@
 
 #global: 0
 #global: 1
+#global: 2
+#global: 3
+#global: 4
+#global: 5
+#global: 6
+#global: 7
+#global: 8
+#global: 9
+#global: 10
+#global: inc
+#global: counter
+#global: count
 #global: add
+#global: sub
+#global: div
 #global: mul
 #global: read_unary
 #global: write_unary
 
 ! Numbers have a counter interface with a step channel and a zero channel which
 ! will return ff or tt (if it is the last step).
-c<<0; +step,zero->c; <-step;tt->zero.
-c<<1; +step,zero->c; <-step;ff->zero; <-step;tt->zero.
+c<<0;  +s,z->c; <-s;tt->z.
+c<<1;  +s,z->c; <-s;ff->z; <-s;tt->z.
+c<<2;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+c<<3;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+c<<4;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+c<<5;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+c<<6;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+c<<7;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+c<<8;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+c<<9;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+c<<10; +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
 
-! Addition of two encoded numbers.
+! Increment
+n,ret<<<inc; +k->ret; c<<k; ns,nz<-<n; +s,z->c; <-s;ff->z;(s>>ns. nz>>z.)
+
+! Counter
+c<<counter; get,set<-<cell; +value,increment,reset;(
+  <>reset; value,increment,reset->c.
+  tun<<value; n<-<get; tun->n.
+  ack<<increment; n<-<get; +ret; n,ret>->inc; m<-ret; m,ack>->set.
+  ack<<reset; 0,ack>->set.
+)
+
+! Create number from a step and zero channel.
+s,z,ret<<<count; k,inc<-<counter; +loop;(
+  ->loop.
+  <<loop; ->s; is_zero<-z; +t,f;(
+    t,f>->is_zero.
+    <-t; k->ret.
+    <-f; <>inc; ->loop.
+  )
+)
+
+! Addition
 n,m,ret<<<add; +k->ret;
 c<<k; ns,nz<-<n; ms,mz<-<m; ,next,stage<-<bool; +step,zero->c;
 <<step; +use_n,use_m;(
@@ -30,7 +74,30 @@ c<<k; ns,nz<-<n; ms,mz<-<m; ,next,stage<-<bool; +step,zero->c;
   )
 )
 
-! Multiplication of two encoded numbers.
+! Subtraction (returns result and if m fits in n)
+n,m,ret<<<sub; ns,nz<-<n; ms,mz<-<m; +loop;(
+  ->loop.
+  <<loop; ->ns;zn<-nz; ->ms;zm<-mz; +t_t,t_f,f_t,f_f;(
+    zn,zm,t_t,t_f,f_t,f_f>->if2.
+    <-t_t; 0,tt->ret.
+    <-t_f; 0,ff->ret.
+    <-f_t; +ans; ns,nz,ans>->count; k<-ans; k,ans>->inc; k<-ans; k,tt->ret.
+    <-f_f; ->loop.
+  )
+)
+
+! Integer division of n by m. Returns result (k) and remainder (rem).
+n,m,ret<<<div; get,set<-<cell; k,k_inc<-<counter;
++ack; n,ack>->set; <-ack; +loop;(
+  ->loop.
+  <<loop; rem<-<get; +ans; rem,m,ans>->sub; remm,ge<-ans; +t,f;(
+    t,f>->ge.
+    <-t; +ack; remm,ack>->set; <-ack; <>k_inc; ->loop.
+    <-f; k,rem->ret.
+  )
+)
+
+! Multiplication
 n,m,ret<<<mul; get,set<-<cell; +ack; 0,ack>->set; <-ack; ns,nz<-<n; +loop;(
   ->loop.
   <<loop; acc<-<get; ->ns; is_zero<-nz; +return,add_m;(
@@ -46,16 +113,10 @@ n,m,ret<<<mul; get,set<-<cell; +ack; 0,ack>->set; <-ack; ns,nz<-<n; +loop;(
 ! Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
 
 ! Read unary number from stdin.
-c<<read_unary; push,pop<-<stack; +ack; 0,ack>->push; <-ack;(
+c<<read_unary; ,finish,active<-<bool; n,inc<-<counter;(
   ->stdin_read.
-  <-stdin__0; empty,n<-<pop; n->c.
-  <<stdin__1; empty,n<-<pop; +next;(
-    ,next>->empty.
-    <-next;
-      +ret; n,1,ret>->add; m<-ret;
-      +ack; m,ack>->push; <-ack;
-      ->stdin_read.
-  )
+  <-stdin__0; <>finish; n->c.
+  <<stdin__1; +do;(do,>->active. <-do; <>inc; ->stdin_read.)
 )
 
 ! Write unary number to stdout.
