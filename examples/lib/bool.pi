@@ -4,13 +4,13 @@
 #global: ff
 #global: switch
 #global: bool
-#global: if2
+#global: dual_if
 
 t,f<<<tt; ->t.
 t,f<<<ff; ->f.
 
 ! If statement with two booleans and 4 branches.
-b1,b2,t_t,t_f,f_t,f_f<<<if2; +t,f;(
+b1,b2,t_t,t_f,f_t,f_f<<<dual_if; +t,f;(
   t,f>->b1.
   <-t; t_t,t_f>->b2.
   <-f; f_t,f_f>->b2.

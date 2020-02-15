@@ -12,6 +12,7 @@
 #global: 8
 #global: 9
 #global: 10
+#global: eq0
 #global: inc
 #global: counter
 #global: count
@@ -35,6 +36,9 @@ c<<7;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z
 c<<8;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
 c<<9;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
 c<<10; +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+
+! Zero-check if statement
+n,t,f<<<eq0; s,z<-<n; ->s; is_zero<-z; t,f>->is_zero.
 
 ! Increment
 n,ret<<<inc; +k->ret; c<<k; ns,nz<-<n; +s,z->c; <-s;ff->z;(s>>ns. nz>>z.)
@@ -78,7 +82,7 @@ c<<k; ns,nz<-<n; ms,mz<-<m; ,next,stage<-<bool; +step,zero->c;
 n,m,ret<<<sub; ns,nz<-<n; ms,mz<-<m; +loop;(
   ->loop.
   <<loop; ->ns;zn<-nz; ->ms;zm<-mz; +t_t,t_f,f_t,f_f;(
-    zn,zm,t_t,t_f,f_t,f_f>->if2.
+    zn,zm,t_t,t_f,f_t,f_f>->dual_if.
     <-t_t; 0,tt->ret.
     <-t_f; 0,ff->ret.
     <-f_t; +ans; ns,nz,ans>->count; k<-ans; k,ans>->inc; k<-ans; k,tt->ret.
@@ -113,16 +117,16 @@ n,m,ret<<<mul; get,set<-<cell; +ack; 0,ack>->set; <-ack; ns,nz<-<n; +loop;(
 ! Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
 
 ! Read unary number from stdin.
-c<<read_unary; ,finish,active<-<bool; n,inc<-<counter;(
+ret<<read_unary; ,finish,active<-<bool; n,inc<-<counter;(
   ->stdin_read.
-  <-stdin__0; <>finish; n->c.
+  <-stdin__0; <>finish; n->ret.
   <<stdin__1; +do;(do,>->active. <-do; <>inc; ->stdin_read.)
 )
 
 ! Write unary number to stdout.
-n<<write_unary; step,zero<-<n; ->step;
+n,ready<<<write_unary; step,zero<-<n; ->step;
   is_zero<<zero; +t,f;(
     t,f>->is_zero.
-    <-t; ->stdout__0;<-stdout_write; ->stdout_0A.
+    <-t; ->stdout__0;<-stdout_write; ->ready.
     <-f; ->stdout__1;<-stdout_write; ->step.
   )

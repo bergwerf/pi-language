@@ -1,0 +1,72 @@
+#attach: nat.pi
+#attach: cell.pi
+#attach: stack.pi
+
+#global: read_decimal
+#global: write_decimal
+
+! Decimal IO for natural numbers: 0_, 1_, 2_, 3_, ...
+
+! Read decimal number.
+ret<<read_decimal; ,finish,active<-<bool; get,set<-<cell;
++ack; 0,ack>->set; <-ack; +add_decimal;(
+  ->stdin_read.
+
+  ! Finish after the first underscore.
+  <-stdin_5F; <>finish; n<-<get; n->ret.
+
+  ! Add new decimal.
+  n<<add_decimal; +do;(
+    do,>->active.
+    <-do; acc<-<get; +ret,ack;
+      acc,10,ret>->mul; acc<-ret;
+      acc,n,ret>->add; acc<-ret;
+      acc,ack>->set; <-ack;
+      ->stdin_read.
+  )
+
+  <<stdin__0; 0->add_decimal.
+  <<stdin__1; 1->add_decimal.
+  <<stdin__2; 2->add_decimal.
+  <<stdin__3; 3->add_decimal.
+  <<stdin__4; 4->add_decimal.
+  <<stdin__5; 5->add_decimal.
+  <<stdin__6; 6->add_decimal.
+  <<stdin__7; 7->add_decimal.
+  <<stdin__8; 8->add_decimal.
+  <<stdin__9; 9->add_decimal.
+)
+
+! Write decimal number.
+n,ready<<<write_decimal; get,set<-<cell; push,pop<-<stack;
++ack; n,ack>->set; <-ack; +extract_digit,print_digit,print_char,finish;(
+  ->extract_digit.
+
+  ! Compute n/10, push remainder on the stack, extract next digit if m > 0.
+  <<extract_digit; n<-<get; +ret; n,10,ret>->div; m,rem<-ret;
+    +ack; m,ack>->set; <-ack; rem,ack>->push; <-ack;
+    m,print_digit,extract_digit>->eq0.
+  
+  ! Print top digit and continue or finish.
+  <<print_digit; empty,digit<-<pop; +print;(
+    finish,print>->empty;
+    <-print; s,z<-<digit;
+           ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__0->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__1->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__2->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__3->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__4->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__5->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__6->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__7->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__8->print_char.
+      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; stdout__9->print_char.
+      ))))))))))
+  )
+
+  ! Print character.
+  char<<print_char; ->char; <-stdout_write; ->print_digit.
+  
+  ! Print underscore and trigger ready.
+  <<finish; ->stdout_5F;<-stdout_write; ->ready.
+)
