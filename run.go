@@ -1,182 +1,189 @@
 package main
 
 import (
-	"container/list"
 	"fmt"
 	"io"
 )
+
+// Pi represents the state of a Pi program.
+type Pi struct {
+	Queue        []Node
+	Ether        []Message
+	Network      map[uint]*Channel
+	CycleCount   uint64
+	ChannelCount uint
+}
 
 // Node represents a process with a number of bound channels. This follows the
 // signalling network metaphor. A process is a pointer from the program AST.
 type Node struct {
 	Proc *Proc  // Process at which this node is paused
 	Refs []uint // Allocated variable IDs (including out of scope ones)
-	Seqs []uint // Message sequence of last sent message on each channel
+	Seqs []uint // Sequence number of last sent message on each channel
 }
 
-// Msg is a message.
-type Msg struct {
+// Message represents a single message.
+type Message struct {
 	Seq       uint
 	ChannelID uint
-	MessageID uint
+	ContentID uint
 }
 
 // Channel holds channel and subscription information.
 type Channel struct {
 	Seq       uint
-	Listening *list.List
+	Listeners []Node
 	PrevCycle uint64
 }
 
-// PrintListeners of a channel.
-func (c *Channel) PrintListeners() {
-	for n := c.Listening.Front(); n != nil; n = n.Next() {
-		node := n.Value.(Node)
-		fmt.Printf("+ %v\n", node.Proc.Location)
+// Schedule adds processes to the queue with the provided context.
+func (pi *Pi) Schedule(proc []*Proc, refs []uint, seqs []uint) {
+	for _, p := range proc {
+		pi.Queue = append(pi.Queue, Node{p, refs, seqs})
 	}
 }
 
-// RunProc runs the given pre-processed program.
-func RunProc(proc []*Proc, input io.Reader, output io.Writer) {
-	queue := make([]Node, 0)
-	ether := make([]Msg, 0)
-	network := make(map[uint]*Channel)
-
-	channelSeq := uint(0) // Used to number channels.
-	cycle := uint64(0)    // Deliver <=1 message per cycle per channel.
+// Initialize sets up the initial program state.
+func (pi *Pi) Initialize(proc []*Proc) {
+	pi.Schedule(proc, nil, nil)
 
 	// Add all interface channels to the network.
-	for channelSeq < reservedChannelIDs {
-		network[channelSeq] = &Channel{0, list.New(), 0}
-		channelSeq++
-	}
-
-	// Queue input program.
-	for _, p := range proc {
-		queue = append(queue, Node{p, nil, nil})
-	}
-
-	// Run simulation until no more nodes are scheduled for running time and the
-	// ether is empty (all messages have been delivered).
-	for len(queue)+len(ether) > 0 {
-		// Run all queued nodes.
-		for len(queue) > 0 {
-			var node Node
-			node, queue = queue[0], queue[1:]
-			switch node.Proc.Action {
-			case PINewRef:
-				assert(len(node.Refs) == int(node.Proc.Channel.Value))
-				refs := copyAppend(node.Refs, channelSeq)
-				seqs := copyAppend(node.Seqs, 0)
-				network[channelSeq] = &Channel{0, list.New(), 0}
-				channelSeq++
-				for _, p := range node.Proc.Children {
-					queue = append(queue, Node{p, refs, seqs})
-				}
-
-			case PISubsOne:
-				fallthrough
-			case PISubsAll:
-				channelID := node.Proc.Channel.ID(node)
-				network[channelID].Listening.PushBack(node)
-
-			case PISend:
-				channelID := node.Proc.Channel.ID(node)
-				messageID := node.Proc.Message.ID(node)
-				channel := network[channelID]
-				seqs := node.Seqs
-
-				// Messages to the debug interface channel are handled immediately. This
-				// is practical because if we wait the subscriber map may change.
-				if channelID == specialChannels["DEBUG"] {
-					println()
-					println("--- DEBUG SECTION ---")
-					fmt.Printf("channel: %v\n", channelID)
-					channel.PrintListeners()
-					println("---------------------")
-				} else {
-					// Otherwise send and update sequence number for this channel. We do
-					// not set sequence numbers for interface channels.
-					channel.Seq++
-					ether = append(ether, Msg{channel.Seq, channelID, messageID})
-					if !node.Proc.Channel.Raw {
-						seqs = make([]uint, len(node.Seqs))
-						copy(seqs, node.Seqs)
-						seqs[node.Proc.Channel.Value] = channel.Seq
-					}
-				}
-
-				for _, p := range node.Proc.Children {
-					queue = append(queue, Node{p, node.Refs, seqs})
-				}
-			}
-		}
-
-		// Deliver at most one message per channel.
-		cycle++
-		messages := ether
-		ether = ether[0:0]
-		for _, msg := range messages {
-			// Check if we already delivered a message to this channel in this cycle.
-			channel := network[msg.ChannelID]
-			if channel.PrevCycle == cycle {
-				ether = append(ether, msg)
-				continue
-			}
-			channel.PrevCycle = cycle
-
-			for ptr := channel.Listening.Front(); ptr != nil; ptr = ptr.Next() {
-				node := ptr.Value.(Node)
-				p := node.Proc
-				assert(p.Channel.ID(node) == msg.ChannelID)
-				assert(len(node.Refs) == int(p.Message.Value))
-
-				// Check if this message is after the node specific channel sequence.
-				if !p.Channel.Raw && msg.Seq <= node.Seqs[p.Channel.Value] {
-					continue
-				}
-
-				// Append message to references and queue child processes.
-				refs := copyAppend(node.Refs, msg.MessageID)
-				seqs := copyAppend(node.Seqs, 0)
-				for _, p := range p.Children {
-					queue = append(queue, Node{p, refs, seqs})
-				}
-
-				// Remove PISubsOne subscription.
-				if node.Proc.Action == PISubsOne {
-					channel.Listening.Remove(ptr)
-				}
-			}
-
-			// Handle interface messages. Note that the way we iterate and overwrite
-			// the ether buffer at the same time is only ok as long as this function
-			// returns at most one message.
-			ether = append(ether, handleInterfaceMessage(input, output, msg)...)
-		}
+	for pi.ChannelCount < reservedChannelIDs {
+		pi.Network[pi.ChannelCount] = &Channel{0, nil, 0}
+		pi.ChannelCount++
 	}
 }
 
-func handleInterfaceMessage(input io.Reader, output io.Writer, msg Msg) []Msg {
+// RunNextNode executes the top node in the process queue.
+func (pi *Pi) RunNextNode() {
+	if len(pi.Queue) == 0 {
+		return
+	}
+
+	var node Node
+	node, pi.Queue = pi.Queue[0], pi.Queue[1:]
+	switch node.Proc.Action {
+	case PINewRef:
+		//assert(len(node.Refs) == int(node.Proc.Channel.Value))
+		id := pi.ChannelCount
+		pi.ChannelCount++
+		pi.Network[id] = &Channel{0, nil, 0}
+
+		refs := copyAppend(node.Refs, id)
+		seqs := copyAppend(node.Seqs, 0)
+		pi.Schedule(node.Proc.Children, refs, seqs)
+
+	case PISubsOne:
+		fallthrough
+	case PISubsAll:
+		channelID := node.Proc.Channel.ID(node)
+		channel := pi.Network[channelID]
+		channel.Listeners = append(channel.Listeners, node)
+
+	case PISend:
+		channelID := node.Proc.Channel.ID(node)
+		messageID := node.Proc.Message.ID(node)
+		channel := pi.Network[channelID]
+		seqs := node.Seqs
+
+		// Messages to the debug interface channel are handled immediately. This
+		// is practical because if we wait the subscriber map may change.
+		if channelID == specialChannels["DEBUG"] {
+			printDebugInfo(channelID, channel)
+		} else {
+			// Otherwise send and update sequence number for this channel. We do
+			// not set sequence numbers for interface channels.
+			channel.Seq++
+			pi.Ether = append(pi.Ether, Message{channel.Seq, channelID, messageID})
+			if !node.Proc.Channel.Raw {
+				// Deep copy the slice because the memory may be shared with
+				seqs = make([]uint, len(node.Seqs))
+				copy(seqs, node.Seqs)
+				seqs[node.Proc.Channel.Value] = channel.Seq
+			}
+		}
+
+		pi.Schedule(node.Proc.Children, node.Refs, seqs)
+	}
+}
+
+// DeliverMessages delivers up to one message per channel from the ether.
+func (pi *Pi) DeliverMessages(input io.Reader, output io.Writer) {
+	pi.CycleCount++
+	messages := pi.Ether
+	pi.Ether = pi.Ether[0:0]
+
+	for _, m := range messages {
+		channel := pi.Network[m.ChannelID]
+
+		// Check if we already delivered a message to this channel in this cycle.
+		if channel.PrevCycle == pi.CycleCount {
+			pi.Ether = append(pi.Ether, m)
+			continue
+		}
+
+		channel.PrevCycle = pi.CycleCount
+		listeners := channel.Listeners
+		channel.Listeners = channel.Listeners[0:0]
+		for _, n := range listeners {
+			//assert(n.Proc.Channel.ID(n) == m.ChannelID)
+			//assert(len(n.Refs) == int(n.Proc.Message.Value))
+
+			// Check if this message is after the node specific channel sequence. If
+			// not put the listener back.
+			if !n.Proc.Channel.Raw && m.Seq <= n.Seqs[n.Proc.Channel.Value] {
+				channel.Listeners = append(channel.Listeners, n)
+				continue
+			}
+
+			// Append message content to references and queue child processes.
+			refs := copyAppend(n.Refs, m.ContentID)
+			seqs := copyAppend(n.Seqs, 0)
+			pi.Schedule(n.Proc.Children, refs, seqs)
+
+			// Renew PISubsAll subscription.
+			if n.Proc.Action == PISubsAll {
+				channel.Listeners = append(channel.Listeners, n)
+			}
+		}
+
+		// Handle interface messages. Note that the way we iterate and overwrite
+		// the ether buffer at the same time is only ok as long as this function
+		// returns at most one message.
+		pi.Ether = append(pi.Ether, handleInterfaceMessage(input, output, m)...)
+	}
+}
+
+func handleInterfaceMessage(in io.Reader, out io.Writer, m Message) []Message {
 	// + Standard input read trigger.
 	// + Standard output byte trigger.
 	// + Debug info channel.
-	id := msg.ChannelID
+	id := m.ChannelID
 	if id == specialChannels["stdin_read"] {
 		// Wait for next byte (or EOF)
 		buf := make([]byte, 1)
-		if _, err := input.Read(buf); err == nil {
+		if _, err := in.Read(buf); err == nil {
 			// Send byte read trigger.
-			return []Msg{Msg{0, uint(buf[0]), msg.MessageID}}
+			return []Message{Message{0, uint(buf[0]), m.ContentID}}
 		} else if err == io.EOF {
 			// Send EOF trigger.
-			return []Msg{Msg{0, specialChannels["stdin_EOF"], msg.MessageID}}
+			return []Message{Message{0, specialChannels["stdin_EOF"], m.ContentID}}
 		}
 	} else if stdoutIDOffset <= id && id < stdoutIDOffset+256 {
 		// Write byte to stdout and send write trigger.
 		b := byte(id - stdoutIDOffset)
-		output.Write([]byte{b})
-		return []Msg{Msg{0, specialChannels["stdout_write"], msg.MessageID}}
+		out.Write([]byte{b})
+		return []Message{Message{0, specialChannels["stdout_write"], m.ContentID}}
 	}
 	return nil
+}
+
+func printDebugInfo(channelID uint, channel *Channel) {
+	println()
+	println("--- DEBUG SECTION ---")
+	fmt.Printf("channel: %v\n", channelID)
+	for _, node := range channel.Listeners {
+		fmt.Printf("+ %v\n", node.Proc.Location)
+	}
+	println("---------------------")
 }
