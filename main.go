@@ -14,10 +14,10 @@ func main() {
 	stdin = os.Stdin
 
 	// Parse all files given by the command line arguments.
+	stack := make([]string, 0)
 	tokens := make([]Token, 0)
-	stack := make([]string, 0) // File reading stack
-	global := MakeSet()        // Global names
-	loaded := MakeSet()        // Already parsed files
+	global := MakeSet() // Global names
+	loaded := MakeSet() // Already parsed files
 
 	for _, arg := range os.Args[1:] {
 		// An --stdin flag is supported for debugging.
@@ -45,7 +45,7 @@ func main() {
 
 		// Extract directives.
 		attachAdd, globalAdd, offset, source := ExtractDirectives(string(bytes))
-		global.AddAll(globalAdd)
+		global.AddAll(castStrSliceToInterface(globalAdd)...)
 
 		// Add attached files relative to this file.
 		for _, attachment := range attachAdd {
@@ -66,25 +66,29 @@ func main() {
 	full = append(full, tokens...)
 	full = append(full, Token{Loc{}, ")"})
 
-	// Process program.
+	// Parse program.
 	err := ErrorList([]error{})
-	proc, unparsed := Parse(full, ioChannelOffset, copyMap(nil), &err)
+	proc, unparsed := Parse(full, ioChannelOffset, copyStrIntMap(nil), &err)
 	if len(unparsed) > 0 {
 		fmt.Printf("%v tokens were not parsed", len(unparsed))
+		return
 	} else if len(err) != 0 {
 		for _, e := range err {
 			println(e.Error())
 		}
-	} else {
-		pi := Pi{0, nil, nil, nil}
-		pi.Initialize(proc)
+		return
+	}
 
-		// Run program.
-		for len(pi.Queue)+len(pi.Ether) > 0 {
-			for len(pi.Queue) > 0 {
-				pi.RunNextNode()
-			}
-			pi.DeliverMessages(stdin, os.Stdout)
+	// Optimize program.
+	proc = Optimize(proc)
+
+	// Run program.
+	pi := Pi{0, nil, nil, nil}
+	pi.Initialize(proc)
+	for len(pi.Queue)+len(pi.Ether) > 0 {
+		for len(pi.Queue) > 0 {
+			pi.RunNextNode()
 		}
+		pi.DeliverMessages(stdin, os.Stdout)
 	}
 }

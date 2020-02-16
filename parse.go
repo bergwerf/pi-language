@@ -6,7 +6,7 @@ import (
 )
 
 // Parse converts a token list into a process.
-func Parse(tokens []Token, refOffset uint, bound map[string]uint, err *ErrorList) ([]*Proc, []Token) {
+func Parse(tokens []Token, refOffset int, bound map[string]int, err *ErrorList) ([]*Proc, []Token) {
 	if len(tokens) == 0 {
 		return nil, nil
 	}
@@ -18,7 +18,7 @@ func Parse(tokens []Token, refOffset uint, bound map[string]uint, err *ErrorList
 		proc := make([]*Proc, 0)
 		tokens = tokens[1:]
 		for tokens[0].Content != sParClose {
-			parsed, remainder := Parse(tokens, refOffset, copyMap(bound), err)
+			parsed, remainder := Parse(tokens, refOffset, copyStrIntMap(bound), err)
 			proc = append(proc, parsed...)
 			tokens = remainder
 			if len(tokens) == 0 {
@@ -33,7 +33,7 @@ func Parse(tokens []Token, refOffset uint, bound map[string]uint, err *ErrorList
 		m := trans.Pattern.FindStringSubmatch(tokens[0].Content)
 		if len(m) > 0 {
 			// Resolve or bind names in pattern.
-			v := make([]uint, len(m)-1)
+			v := make([]int, len(m)-1)
 			for i, name := range m[1:] {
 				if trans.BindVar>>i == 0 {
 					// Resolve.
@@ -72,13 +72,13 @@ func Parse(tokens []Token, refOffset uint, bound map[string]uint, err *ErrorList
 }
 
 // Check if a name is bound or if it is an IO channel.
-func resolveName(name string, bound map[string]uint) (uint, error) {
+func resolveName(name string, bound map[string]int) (int, error) {
 	// Check if the name is bound.
 	if index, isBound := bound[name]; isBound {
 		return index, nil
 	}
 	// Hexadecimal stdin/stdout
-	offset := uint(0)
+	offset := 0
 	m := stdinHexRE.FindStringSubmatch(name)
 	if len(m) == 0 {
 		offset = stdoutOffset
@@ -86,7 +86,7 @@ func resolveName(name string, bound map[string]uint) (uint, error) {
 	}
 	if len(m) != 0 {
 		v, _ := hex.DecodeString(m[1])
-		return offset + uint(v[0]), nil
+		return offset + int(v[0]), nil
 	}
 	// Alphanumeric stdin/stdout
 	offset = 0
@@ -97,7 +97,7 @@ func resolveName(name string, bound map[string]uint) (uint, error) {
 	}
 	if len(m) != 0 {
 		b := byte(m[1][0])
-		return offset + uint(b), nil
+		return offset + int(b), nil
 	}
 	// Other IO channels
 	for k, index := range miscIOChannels {

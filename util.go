@@ -1,49 +1,26 @@
 package main
 
 import (
-	"container/list"
 	"fmt"
 	"path/filepath"
 )
 
-// ListUnion merges the second list into the first list while retaining order.
-func ListUnion(dst *list.List, src *list.List) {
-	for e1, e2 := src.Front(), dst.Front(); e2 != nil; {
-		if e1 == nil {
-			dst.PushBack(e2.Value)
-			e2.Next()
-			continue
-		}
-		v1, v2 := e1.Value.(uint), e2.Value.(uint)
-		if v1 == v2 {
-			e2.Next()
-		} else if v1 < v2 {
-			e1.Next()
-		} else {
-			dst.InsertBefore(v2, e1)
-		}
-	}
-}
-
-// Create a deep copy of a string to uint map.
-func copyMap(m map[string]uint) map[string]uint {
-	n := make(map[string]uint, len(m))
+func copyStrIntMap(m map[string]int) map[string]int {
+	n := make(map[string]int, len(m))
 	for k, v := range m {
 		n[k] = v
 	}
 	return n
 }
 
-// Convert list to uint slice.
-func toSlice(l *list.List) []uint {
-	output := make([]uint, 0, l.Len())
-	for ptr := l.Front(); ptr != nil; ptr = ptr.Next() {
-		output = append(output, ptr.Value.(uint))
+func castStrSliceToInterface(src []string) []interface{} {
+	dst := make([]interface{}, len(src))
+	for i, str := range src {
+		dst[i] = str
 	}
-	return output
+	return dst
 }
 
-// Assertion shortcut
 func assert(condition bool) {
 	if !condition {
 		panic("failed assertion")
@@ -64,43 +41,50 @@ func (l Loc) String() string {
 }
 
 // Set is a hash set using a map.
-type Set map[string]bool
+type Set map[interface{}]bool
 
 // MakeSet makes a new Set.
 func MakeSet() Set {
-	return Set(map[string]bool{})
+	return Set(map[interface{}]bool{})
 }
 
 // Add element.
-func (s Set) Add(k string) {
+func (s Set) Add(k interface{}) {
 	s[k] = true
 }
 
 // Remove element.
-func (s Set) Remove(k string) {
+func (s Set) Remove(k interface{}) {
 	delete(s, k)
 }
 
 // AddAll elements.
-func (s Set) AddAll(a []string) {
+func (s Set) AddAll(a ...interface{}) {
 	for _, k := range a {
 		s.Add(k)
 	}
 }
 
+// Union with another set.
+func (s Set) Union(t Set) {
+	for k := range t {
+		s.Add(k)
+	}
+}
+
 // Contains element.
-func (s Set) Contains(k string) bool {
+func (s Set) Contains(k interface{}) bool {
 	if _, in := s[k]; in {
 		return true
 	}
 	return false
 }
 
-// ToSlice returns a slice of elements.
-func (s Set) ToSlice() []string {
-	elements := make([]string, 0, len(s))
+// Copy returns a deep copy of the set.
+func (s Set) Copy() Set {
+	newSet := Set(make(map[interface{}]bool, len(s)))
 	for k := range s {
-		elements = append(elements, k)
+		newSet.Add(k)
 	}
-	return elements
+	return newSet
 }

@@ -50,7 +50,7 @@ func (pi *Pi) Schedule(proc []*Proc, refs []*Channel) {
 func (pi *Pi) Initialize(proc []*Proc) {
 	// Create IO channels.
 	pi.Stdio = make([]*Channel, ioChannelOffset)
-	for i := 0; i < int(ioChannelOffset); i++ {
+	for i := 0; i < ioChannelOffset; i++ {
 		pi.Stdio[i] = &Channel{i, nil, 0}
 	}
 	pi.Schedule(proc, copyRefs(pi.Stdio))
@@ -64,10 +64,15 @@ func (pi *Pi) RunNextNode() {
 
 	var node Node
 	node, pi.Queue = pi.Queue[0], pi.Queue[1:]
+
 	switch node.Proc.Command {
 	case PINewRef:
-		assert(len(node.Refs) == int(node.Proc.Channel))
+		assert(len(node.Refs) == node.Proc.Channel)
 		refs := append(node.Refs, &Channel{-1, nil, 0})
+		pi.Schedule(node.Proc.Children, refs)
+
+	case PIDeref:
+		refs := deleteRef(node.Refs, node.Proc.Channel)
 		pi.Schedule(node.Proc.Children, refs)
 
 	case PISubsOne:
@@ -84,7 +89,7 @@ func (pi *Pi) RunNextNode() {
 
 		// Messages to the debug channel are handled immediately. This is practical
 		// because if we wait the listeners may change.
-		if channel.IOIndex == int(miscIOChannels["DEBUG"]) {
+		if channel.IOIndex == miscIOChannels["DEBUG"] {
 			message.PrintDebugInfo()
 		}
 	}
@@ -110,7 +115,7 @@ func (pi *Pi) DeliverMessages(input io.Reader, output io.Writer) {
 		listeners := m.Channel.Listeners
 		m.Channel.Listeners = m.Channel.Listeners[0:0]
 		for _, node := range listeners {
-			assert(len(node.Refs) == int(node.Proc.Message))
+			assert(len(node.Refs) == node.Proc.Message)
 
 			// Copy references of a PISubsAll subscription and renew subscription.
 			refs := node.Refs
@@ -124,6 +129,11 @@ func (pi *Pi) DeliverMessages(input io.Reader, output io.Writer) {
 			pi.Schedule(node.Proc.Children, refs)
 		}
 
+		// Clear part of the listeners that we did not overwrite (for GC).
+		for i := len(m.Channel.Listeners); i < len(listeners); i++ {
+			listeners[i] = Node{}
+		}
+
 		// Handle IO messages. Note that the way we iterate and overwrite the ether
 		// buffer at the same time is only ok as long as this function returns at
 		// most one message.
@@ -132,13 +142,18 @@ func (pi *Pi) DeliverMessages(input io.Reader, output io.Writer) {
 			pi.Ether = append(pi.Ether, ioMessages...)
 		}
 	}
+
+	// Clear part of the ether that we did not overwrite (for GC).
+	for i := len(pi.Ether); i < len(messages); i++ {
+		messages[i] = Message{}
+	}
 }
 
 func handleStdioMessage(stdio []*Channel, in io.Reader, out io.Writer, m Message) []Message {
 	// + Standard input read trigger.
 	// + Standard output byte trigger.
 	// + Debug info channel.
-	id := uint(m.Channel.IOIndex)
+	id := m.Channel.IOIndex
 	if id == miscIOChannels["stdin_read"] {
 		// Wait for next byte (or EOF)
 		buf := make([]byte, 1)
@@ -172,8 +187,14 @@ func (c *Channel) PrintDebugInfo() {
 }
 
 func copyRefs(src []*Channel) []*Channel {
-	// 7 is arbitrary, but we add a bit of extra capacity to future appends.
-	dst := make([]*Channel, len(src), len(src)+7)
-	copy(dst, src)
-	return dst
+	return append(src[:0:0], src...)
+}
+
+func deleteRef(src []*Channel, i int) []*Channel {
+	// See https://github.com/golang/go/wiki/SliceTricks
+	if i < len(src)-1 {
+		copy(src[i:], src[i+1:])
+	}
+	src[len(src)-1] = nil
+	return src[:len(src)-1]
 }

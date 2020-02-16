@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 // Language primitives
@@ -24,7 +25,8 @@ var (
 
 // Core language
 const (
-	PINewRef = iota
+	PINewRef uint8 = 1 << iota
+	PIDeref
 	PISubsOne
 	PISubsAll
 	PISend
@@ -33,18 +35,18 @@ const (
 // Proc is a PI process.
 type Proc struct {
 	Location Loc
-	Command  int
-	Channel  uint    // Variable of new or receive/send channel
-	Message  uint    // Variable of receive/send message
+	Command  uint8
+	Channel  int     // Variable of new or receive/send channel
+	Message  int     // Variable of receive/send message
 	Children []*Proc // Child processes (parallel)
 }
 
 // Core syntax.
 var coreSyntax = []Transform{
-	trans("\\+%v", 1, func(loc Loc, v []uint) *Proc { return &Proc{loc, PINewRef, v[0], 0, nil} }, nameCan),
-	trans("%v<-%v", 1, func(loc Loc, v []uint) *Proc { return &Proc{loc, PISubsOne, v[1], v[0], nil} }, nameCan, nameCan),
-	trans("%v<<%v", 1, func(loc Loc, v []uint) *Proc { return &Proc{loc, PISubsAll, v[1], v[0], nil} }, nameCan, nameCan),
-	trans("%v->%v", 0, func(loc Loc, v []uint) *Proc { return &Proc{loc, PISend, v[1], v[0], nil} }, nameCan, nameCan),
+	trans("\\+%v", 1, func(loc Loc, v []int) *Proc { return &Proc{loc, PINewRef, v[0], -1, nil} }, nameCan),
+	trans("%v<-%v", 1, func(loc Loc, v []int) *Proc { return &Proc{loc, PISubsOne, v[1], v[0], nil} }, nameCan, nameCan),
+	trans("%v<<%v", 1, func(loc Loc, v []int) *Proc { return &Proc{loc, PISubsAll, v[1], v[0], nil} }, nameCan, nameCan),
+	trans("%v->%v", 0, func(loc Loc, v []int) *Proc { return &Proc{loc, PISend, v[1], v[0], nil} }, nameCan, nameCan),
 }
 
 // Rewrites to convert PI source code to a normal form. To avoid collisions
@@ -111,22 +113,22 @@ var (
 	stdinAlphaNumRE, _ = regexp.Compile("^stdin__([a-zA-Z0-9])$")
 
 	// 256..511
-	stdoutOffset        = uint(256)
+	stdoutOffset        = 256
 	stdoutHexRE, _      = regexp.Compile("^stdout_([0-9A-F]{2})$")
 	stdoutAlphaNumRE, _ = regexp.Compile("^stdout__([a-zA-Z0-9])$")
 
 	// Other channels
-	miscIOChannels = map[string]uint{
+	miscIOChannels = map[string]int{
 		"stdin_EOF":  513,
 		"stdin_read": 512,
 		"DEBUG":      514,
 	}
 
-	ioChannelOffset = uint(515)
+	ioChannelOffset = 515
 )
 
 // BuildProc builds a process.
-type BuildProc func(Loc, []uint) *Proc
+type BuildProc func(Loc, []int) *Proc
 
 // Rewrite is a regular expression based string rewrite.
 type Rewrite struct {
@@ -155,4 +157,33 @@ func trans(format string, bind int, build BuildProc, types ...interface{}) Trans
 	typedFmt := fmt.Sprintf(prefixFmt, types...)
 	re, _ := regexp.Compile(typedFmt)
 	return Transform{re, bind, build}
+}
+
+func (p *Proc) String() string {
+	command := ""
+	switch p.Command {
+	case PINewRef:
+		command = fmt.Sprintf("+%v", p.Channel)
+	case PIDeref:
+		command = fmt.Sprintf("~%v", p.Channel)
+	case PISubsOne:
+		command = fmt.Sprintf("%v<-%v", p.Message, p.Channel)
+	case PISubsAll:
+		command = fmt.Sprintf("%v<<%v", p.Message, p.Channel)
+	case PISend:
+		command = fmt.Sprintf("%v->%v", p.Message, p.Channel)
+	}
+
+	switch len(p.Children) {
+	case 0:
+		return fmt.Sprintf("%v.", command)
+	case 1:
+		return fmt.Sprintf("%v;%v", command, p.Children[0])
+	default:
+		children := make([]string, len(p.Children))
+		for i, p := range p.Children {
+			children[i] = p.String()
+		}
+		return fmt.Sprintf("%v;(%v)", command, strings.Join(children, " "))
+	}
 }

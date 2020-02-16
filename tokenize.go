@@ -49,12 +49,7 @@ func Tokenize(source string, start Loc, relativeLoc bool) []Token {
 			for _, rw := range extendedSyntax {
 				m3 := rw.Pattern.FindStringSubmatch(line)
 				if len(m3) > 0 {
-					// Cast parameters to interface{} for Sprintf.
-					parts := make([]interface{}, len(m3))
-					for i, str := range m3 {
-						parts[i] = str
-					}
-
+					parts := castStrSliceToInterface(m3)
 					replace := fmt.Sprintf(rw.Replace, parts[1:]...)
 					result := Tokenize(replace, loc, false)
 					tokens = append(tokens, result...)

@@ -90,8 +90,3 @@ needed such that the simulator can perform reference counting) such that they
 can be closed (or else a multitude of open channels will accumulate). I am not
 sure if it is possible to create a channel that can send arbitary typed channels
 itself. Otherwise a central channel registry is needed.
-
-Proposed syntaxes
------------------
-- `"Ab"` means `->stdout__A;<-stdout_write;->stdout__b;<-stdout_write`
-- `(if?then:else)` means `+t,f;(+t,f>->if. <-t;then. <-f;else.)`
