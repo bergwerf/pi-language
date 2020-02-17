@@ -2,18 +2,23 @@
 #attach: cell.pi
 #attach: stack.pi
 
-#global: read_decimal
-#global: write_decimal
+#global: read_base10
+#global: write_base10
 
-! Decimal IO for natural numbers: 0_, 1_, 2_, 3_, ...
+! Base 10 encoding of numbers: 0_, 1_, 2_, 3_, ...
 
 ! Read decimal number.
-ret<<read_decimal; ,finish,active<-<bool; get,set<-<cell;
-+ack; 0,ack>->set; <-ack; +add_decimal;(
+ret<<read_base10; ,finish,active<-<bool; get,set<-<cell;
++ack; 0,ack>->set; <-ack; +add_decimal,do_finish;(
   ->stdin_read.
 
-  ! Finish after the first underscore.
-  <-stdin_5F; <>finish; n<-<get; n->ret.
+  ! Finish after the first underscore or at EOF.
+  <-do_finish; +do;(
+    do,>->active.
+    <-do; <>finish; n<-<get; n->ret.
+  )
+  <-stdin_5F; ->do_finish.
+  <-stdin_EOF; ->do_finish.
 
   ! Add new decimal.
   n<<add_decimal; +do;(
@@ -38,7 +43,7 @@ ret<<read_decimal; ,finish,active<-<bool; get,set<-<cell;
 )
 
 ! Write decimal number.
-n,ready<<<write_decimal; get,set<-<cell; push,pop<-<stack;
+n,ready<<<write_base10; get,set<-<cell; push,pop<-<stack;
 +ack; n,ack>->set; <-ack; +extract_digit,print_digit,finish;(
   ->extract_digit.
 

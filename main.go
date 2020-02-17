@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,8 +11,18 @@ import (
 )
 
 func main() {
+	stdinFlag := flag.String("stdin", "", "Override standard input.")
+	stdinAddFlag := flag.String("stdin_add", "", "Append to standard input.")
+	flag.Parse()
+
 	var stdin io.Reader
 	stdin = os.Stdin
+	if len(*stdinFlag) != 0 {
+		stdin = strings.NewReader(*stdinFlag)
+	}
+	if len(*stdinAddFlag) != 0 {
+		stdin = io.MultiReader(stdin, strings.NewReader(*stdinAddFlag))
+	}
 
 	// Parse all files given by the command line arguments.
 	stack := make([]string, 0)
@@ -19,14 +30,9 @@ func main() {
 	global := MakeSet() // Global names
 	loaded := MakeSet() // Already parsed files
 
-	for _, arg := range os.Args[1:] {
-		// An --stdin flag is supported for debugging.
-		if strings.HasPrefix(arg, "--stdin=") {
-			stdin = strings.NewReader(arg[8:])
-		} else {
-			path, _ := filepath.Abs(arg)
-			stack = append(stack, path)
-		}
+	for _, arg := range flag.Args() {
+		path, _ := filepath.Abs(arg)
+		stack = append(stack, path)
 	}
 
 	for len(stack) > 0 {

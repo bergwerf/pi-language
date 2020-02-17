@@ -1,0 +1,19 @@
+! Tape implementation using two stacks and one cell.
+
+#attach: cell.pi
+#attach: stack.pi
+
+#global: tape
+
+c<<tape; pushl,popl<-<stack; pushr,popr<-<stack; get,set<-<cell;
++movl,movr;(
+  get,set,movl,movr,pushl,popl,pushr,popr->c.
+  ret<<movl;
+    empty,xl<-<popl; xc<-<get;
+    +ack; xc,ack>->pushr; <-ack; xl,ack>->set; <-ack;
+    empty->ret.
+  ret<<movr;
+    empty,xr<-<popr; xc<-<get;
+    +ack; xc,ack>->pushl; <-ack; xr,ack>->set; <-ack;
+    empty->ret.
+)

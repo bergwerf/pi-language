@@ -1,0 +1,118 @@
+! A Brainfuck interpreter in PI.
+!
+! The brainfuck program (< > + - . , [ ]) is read until the first colon (:) the
+! remaining input is treated as decimal input for the tape. In theory this
+! implementation supports an infinite tape and arbitrarily big natural numbers.
+!
+! + Hello World!:
+! cat examples/bf/hello_world.bf | go run . examples/brainfuck.pi
+!
+! + Compute addition:
+! go run . -stdin ",>,<[->+<]>.:42_24_" examples/brainfuck.pi
+!
+! + Bubble sort:
+! cat examples/bf/bsort.bf | go run . -stdin_add ":13_4_7" examples/brainfuck.pi
+
+#attach: lib/nat.pi
+#attach: lib/bool.pi
+#attach: lib/tape.pi
+#attach: lib/base10.pi
+
+#global: bf_start
+#global: bf_movl
+#global: bf_movr
+#global: bf_incr
+#global: bf_decr
+#global: bf_wrte
+#global: bf_read
+#global: bf_jmps
+#global: bf_jmpe
+#global: bf_end
+
+t,,,,,,,,,<<<bf_start; ->t.
+,t,,,,,,,,<<<bf_movl; ->t.
+,,t,,,,,,,<<<bf_movr; ->t.
+,,,t,,,,,,<<<bf_incr; ->t.
+,,,,t,,,,,<<<bf_decr; ->t.
+,,,,,t,,,,<<<bf_wrte; ->t.
+,,,,,,t,,,<<<bf_read; ->t.
+,,,,,,,t,,<<<bf_jmps; ->t.
+,,,,,,,,t,<<<bf_jmpe; ->t.
+,,,,,,,,,t<<<bf_end; ->t.
+
+! Instruction tape (mark instruction tape start)
+I_get,I_set,I_movl,I_movr,I_push<-<tape;
++ack; bf_start,ack>->I_push; <-ack;
+
+! Program memory tape (initialize current tape cell to 0)
+get,set,movl,movr<-<tape;
++ack; 0,ack>->set; <-ack;
+
+,init_ready,state_init<-<bool;
++push_instr,execute,walkl,walkr,next,terminate;(
+  ->stdin_read.
+
+  ! Read instructions.
+  instr<<push_instr; +do;(
+    do,>->state_init.
+    <-do; +ack; instr,ack>->I_push; <-ack; ->stdin_read.
+  )
+
+  <<stdin_3C; bf_movl->push_instr. ! <
+  <<stdin_3E; bf_movr->push_instr. ! >
+  <<stdin_2B; bf_incr->push_instr. ! +
+  <<stdin_2D; bf_decr->push_instr. ! -
+  <<stdin_2E; bf_wrte->push_instr. ! .
+  <<stdin_2C; bf_read->push_instr. ! ,
+  <<stdin_5B; bf_jmps->push_instr. ! [
+  <<stdin_5D; bf_jmpe->push_instr. ! ]
+  <<stdin_0A; ->stdin_read.        ! \n
+  <<stdin_3A; ->execute.           ! :
+  <-stdin_EOF; ->execute.
+  
+  <<execute; +do; (
+    do,>->state_init;
+    <-do; <>init_ready;
+    +ack; bf_end,ack>->I_set; <-ack; ! Mark instruction tape end.
+    1,next>->walkl.
+  )
+
+  ! Walk to the matching [ or the program start.
+  depth,ready<<<walkl; +continue;(
+    depth,ready,continue>->eq0.
+    <-continue; <>I_movl; instr<-<I_get; +jmps,jmpe,x;(
+      ready,x,x,x,x,x,x,jmps,jmpe,>->instr.
+      <-jmps; +ret; depth,ret>->decr; depth<-ret; depth,ready>->walkl.
+      <-jmpe; +ret; depth,ret>->incr; depth<-ret; depth,ready>->walkl.
+      <-x; depth,ready>->walkl.
+    )
+  )
+
+  ! Walk to the matching ] or the program end.
+  depth,ready<<<walkr; +continue;(
+    depth,ready,continue>->eq0.
+    <-continue; <>I_movr; instr<-<I_get; +jmps,jmpe,x;(
+      ,x,x,x,x,x,x,jmps,jmpe,ready>->instr.
+      <-jmps; +ret; depth,ret>->incr; depth<-ret; depth,ready>->walkr.
+      <-jmpe; +ret; depth,ret>->decr; depth<-ret; depth,ready>->walkr.
+      <-x; depth,ready>->walkr.
+    )
+  )
+
+  ! Execute next instruction. Note that uninitialized cells are set to 0.
+  <<next; <>I_movr; instr<-<I_get;
+  +_movl,_movr,_incr,_decr,_wrte,_read,_jmps,_jmpe;(
+    ,_movl,_movr,_incr,_decr,_wrte,_read,_jmps,_jmpe,terminate>->instr.
+    <-_movl; empty<-<movl; +init;(init,next>->empty. <-init; 0,next>->set.)
+    <-_movr; empty<-<movr; +init;(init,next>->empty. <-init; 0,next>->set.)
+    <-_incr; n<-<get; +ret; n,ret>->incr; n<-ret; n,next>->set.
+    <-_decr; n<-<get; +ret; n,ret>->decr; n<-ret; n,next>->set.
+    <-_wrte; n<-<get; n,next>->write_base10.
+    <-_read; n<-<read_base10; n,next>->set.
+    <-_jmps; n<-<get; +jmpr;(n,jmpr,next>->eq0. <-jmpr; 1,next>->walkr.)
+    <-_jmpe; n<-<get; +jmpl;(n,next,jmpl>->eq0. <-jmpl; 1,next>->walkl.)
+  )
+
+  ! End of the program is reached
+  <<terminate; ->stdout_0A.
+)

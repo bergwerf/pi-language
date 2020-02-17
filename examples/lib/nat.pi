@@ -13,15 +13,16 @@
 #global: 9
 #global: 10
 #global: eq0
-#global: inc
+#global: incr
+#global: decr
 #global: counter
 #global: count
 #global: add
 #global: sub
 #global: div
 #global: mul
-#global: read_unary
-#global: write_unary
+#global: read_base1
+#global: write_base1
 
 ! Numbers have a counter interface with a step channel and a zero channel which
 ! will return ff or tt (if it is the last step).
@@ -41,23 +42,26 @@ c<<10; +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z
 n,t,f<<<eq0; s,z<-<n; ->s; is_zero<-z; t,f>->is_zero.
 
 ! Increment
-n,ret<<<inc; +k->ret; c<<k; ns,nz<-<n; +s,z->c; <-s;ff->z;(s>>ns. nz>>z.)
+n,ret<<<incr; +k->ret; c<<k; ns,nz<-<n; +s,z->c; <-s;ff->z;(s>>ns. nz>>z.)
+
+! Unsafe decrement (no zero check)
+n,ret<<<decr; +k->ret; c<<k; ns,nz<-<n; ->ns;<-nz; ns,nz->c.
 
 ! Counter
 c<<counter; get,set<-<cell; +value,increment,reset;(
   <>reset; value,increment,reset->c.
   tun<<value; n<-<get; tun->n.
-  ack<<increment; n<-<get; +ret; n,ret>->inc; m<-ret; m,ack>->set.
+  ack<<increment; n<-<get; +ret; n,ret>->incr; m<-ret; m,ack>->set.
   ack<<reset; 0,ack>->set.
 )
 
 ! Create number from a step and zero channel.
-s,z,ret<<<count; k,inc<-<counter; +loop;(
+s,z,ret<<<count; k,incr<-<counter; +loop;(
   ->loop.
   <<loop; ->s; is_zero<-z; +t,f;(
     t,f>->is_zero.
     <-t; k->ret.
-    <-f; <>inc; ->loop.
+    <-f; <>incr; ->loop.
   )
 )
 
@@ -85,18 +89,18 @@ n,m,ret<<<sub; ns,nz<-<n; ms,mz<-<m; +loop;(
     zn,zm,t_t,t_f,f_t,f_f>->dual_if.
     <-t_t; 0,tt->ret.
     <-t_f; 0,ff->ret.
-    <-f_t; +ans; ns,nz,ans>->count; k<-ans; k,ans>->inc; k<-ans; k,tt->ret.
+    <-f_t; +ans; ns,nz,ans>->count; k<-ans; k,ans>->incr; k<-ans; k,tt->ret.
     <-f_f; ->loop.
   )
 )
 
 ! Integer division of n by m. Returns result (k) and remainder (rem).
-n,m,ret<<<div; get,set<-<cell; k,k_inc<-<counter;
+n,m,ret<<<div; get,set<-<cell; k,k_incr<-<counter;
 +ack; n,ack>->set; <-ack; +loop;(
   ->loop.
   <<loop; rem<-<get; +ans; rem,m,ans>->sub; remm,ge<-ans; +t,f;(
     t,f>->ge.
-    <-t; +ack; remm,ack>->set; <-ack; <>k_inc; ->loop.
+    <-t; +ack; remm,ack>->set; <-ack; <>k_incr; ->loop.
     <-f; k,rem->ret.
   )
 )
@@ -114,19 +118,18 @@ n,m,ret<<<mul; get,set<-<cell; +ack; 0,ack>->set; <-ack; ns,nz<-<n; +loop;(
   )
 )
 
-! Unary IO for natural numbers: 0, 10, 110, 1110, ..., 1^n0
+! Base 1 encoding of numbers: 0, 10, 110, 1110, ..., 1^n0
 
-! Read unary number from stdin.
-ret<<read_unary; ,finish,active<-<bool; n,inc<-<counter;(
+! Read base 1 number from stdin.
+ret<<read_base1; ,finish,active<-<bool; n,incr<-<counter;(
   ->stdin_read.
   <-stdin__0; <>finish; n->ret.
-  <<stdin__1; +do;(do,>->active. <-do; <>inc; ->stdin_read.)
+  <<stdin__1; +do;(do,>->active. <-do; <>incr; ->stdin_read.)
 )
 
-! Write unary number to stdout.
-n,ready<<<write_unary; step,zero<-<n; ->step;
-  is_zero<<zero; +t,f;(
-    t,f>->is_zero.
-    <-t; <>stdout__0; ->ready.
-    <-f; <>stdout__1; ->step.
-  )
+! Write base 1 number to stdout.
+n,ready<<<write_base1; step,zero<-<n; ->step; is_zero<<zero; +t,f;(
+  t,f>->is_zero.
+  <-t; <>stdout__0; ->ready.
+  <-f; <>stdout__1; ->step.
+)

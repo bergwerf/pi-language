@@ -3,14 +3,14 @@
 ! 110+10*1110+10 --> 11111111110
 
 #attach: lib/nat.pi
-#attach: lib/dec.pi
 #attach: lib/cell.pi
+#attach: lib/base10.pi
 
-get,set<-<cell; n<-<read_decimal; +ack; n,ack>->set; <-ack; +loop;+compute;(
+get,set<-<cell; n<-<read_base10; +ack; n,ack>->set; <-ack; +loop;+compute;(
   ->loop.
 
   op<<compute;
-    n<-<get; m<-<read_decimal;
+    n<-<get; m<-<read_base10;
     +ret; n,m,ret>->op; k<-ret;
     +ack; k,ack>->set; <-ack;
     ->loop.
@@ -22,11 +22,11 @@ get,set<-<cell; n<-<read_decimal; +ack; n,ack>->set; <-ack; +loop;+compute;(
     <-stdin_2F; div->compute. ! /
     <-stdin_2A; mul->compute. ! *
     <-stdin_25; ! %
-      n<-<get; m<-<read_decimal;
+      n<-<get; m<-<read_base10;
       +ret; n,m,ret>->div; ,rem<-ret;
       +ack; rem,ack>->set; <-ack;
       ->loop.
 
-    <-stdin_EOF; n<-<get; +ack; n,ack>->write_decimal; <-ack; ->stdout_0A.
+    <-stdin_EOF; n<-<get; +ack; n,ack>->write_base10; <-ack; ->stdout_0A.
   )
 )

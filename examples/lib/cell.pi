@@ -3,7 +3,8 @@
 
 ! Memory cell (get/set)
 c<<cell; +get,set,_get,_set;(
-  get,set->c.
+  ! Initialize getter to avoid a deadlock.
+  +x,ack; x,ack>->set; <-ack; get,set->c.
 
   ! _get imposter for initial value
   reset,ret<<-_get; ->ret.

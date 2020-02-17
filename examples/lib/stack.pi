@@ -9,7 +9,7 @@ r<<stack; +push,pop,_pop,peek;(
       if,else>->cascade.
       <-if; finish->bottom.
       <-else; ->finish.
-      <-finish; tt,,bottom->ret.
+      <-finish; +none; tt,none,bottom->ret.
     )
   )
 
