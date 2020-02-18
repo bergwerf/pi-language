@@ -163,27 +163,35 @@ func (p *Proc) String() string {
 	command := ""
 	switch p.Command {
 	case PINewRef:
-		command = fmt.Sprintf("+%v", p.Channel)
+		command = fmt.Sprintf("+%v_", p.Channel)
 	case PIDeref:
-		command = fmt.Sprintf("~%v", p.Channel)
+		command = fmt.Sprintf("~%v_", p.Channel)
 	case PISubsOne:
-		command = fmt.Sprintf("%v<-%v", p.Message, p.Channel)
+		command = fmt.Sprintf("%v_<-%v_", p.Message, p.Channel)
 	case PISubsAll:
-		command = fmt.Sprintf("%v<<%v", p.Message, p.Channel)
+		command = fmt.Sprintf("%v_<<%v_", p.Message, p.Channel)
 	case PISend:
-		command = fmt.Sprintf("%v->%v", p.Message, p.Channel)
+		command = fmt.Sprintf("%v_->%v_", p.Message, p.Channel)
 	}
 
-	switch len(p.Children) {
-	case 0:
+	if len(p.Children) == 0 {
 		return fmt.Sprintf("%v.", command)
+	}
+	return fmt.Sprintf("%v;%v", command, ProcString(p.Children))
+}
+
+// ProcString returns a string containing all the given processes.
+func ProcString(proc []*Proc) string {
+	switch len(proc) {
+	case 0:
+		return ""
 	case 1:
-		return fmt.Sprintf("%v;%v", command, p.Children[0])
+		return proc[0].String()
 	default:
-		children := make([]string, len(p.Children))
-		for i, p := range p.Children {
-			children[i] = p.String()
+		strs := make([]string, len(proc))
+		for i, p := range proc {
+			strs[i] = p.String()
 		}
-		return fmt.Sprintf("%v;(%v)", command, strings.Join(children, " "))
+		return fmt.Sprintf("(%v)", strings.Join(strs, " "))
 	}
 }

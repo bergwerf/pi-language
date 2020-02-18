@@ -11,17 +11,24 @@ import (
 )
 
 func main() {
-	stdinFlag := flag.String("stdin", "", "Override standard input.")
-	stdinAddFlag := flag.String("stdin_add", "", "Append to standard input.")
+	stdinStr := flag.String("stdin", "",
+		"Override standard input.")
+	stdinAddStr := flag.String("stdin_add", "",
+		"Append to standard input.")
+	writeCoreFile := flag.String("write_core", "",
+		"Output core language.")
+	writeOptCoreFile := flag.String("write_opt_core", "",
+		"Output optimized core language.")
+
 	flag.Parse()
 
 	var stdin io.Reader
 	stdin = os.Stdin
-	if len(*stdinFlag) != 0 {
-		stdin = strings.NewReader(*stdinFlag)
+	if len(*stdinStr) != 0 {
+		stdin = strings.NewReader(*stdinStr)
 	}
-	if len(*stdinAddFlag) != 0 {
-		stdin = io.MultiReader(stdin, strings.NewReader(*stdinAddFlag))
+	if len(*stdinAddStr) != 0 {
+		stdin = io.MultiReader(stdin, strings.NewReader(*stdinAddStr))
 	}
 
 	// Parse all files given by the command line arguments.
@@ -85,8 +92,23 @@ func main() {
 		return
 	}
 
+	// Write unoptimized core.
+	if len(*writeCoreFile) > 0 {
+		out, _ := os.Create(*writeCoreFile)
+		out.WriteString(ProcString(proc))
+		out.Close()
+	}
+
 	// Optimize program.
 	proc = Optimize(proc)
+
+	// Write optimized core.
+	if len(*writeOptCoreFile) > 0 {
+		out, _ := os.Create(*writeOptCoreFile)
+		out.WriteString(ProcString(proc))
+		out.WriteString("\n")
+		out.Close()
+	}
 
 	// Run program.
 	pi := Pi{0, nil, nil, nil}
