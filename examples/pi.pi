@@ -1,0 +1,147 @@
+! Compute an approximation of π in PI.
+! Although PI is particularly unfit to compute π, I feel obliged to do it.
+! This merely computes digits of 355/113. A more accurate result would require
+! the implementation of binary arithmetic and rational numbers.
+
+#attach: lib/nat.pi
+#attach: lib/tape.pi
+#attach: lib/base10.pi
+
+#global: numerator
+#global: denominator
+#global: times10
+#global: subden
+
+! Numerator: 355
+c<<numerator; +N,z->c;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a; a<-N;->a;
+a<-N;->a; a<-N;->a; a<-N;->a; <-N;->z.
+
+! Denominator: 113
+c<<denominator; +D,z->c;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a; a<-D;->a;
+a<-D;->a; <-D;->z.
+
+! Magnify (s,z) by ten.
+s,z,ret<<<times10; +s10,z10->ret; +loop;(
+  ->loop.
+  <-z;->z10.
+  <<loop; a<-s10; <>s; ->a;
+    a<-s10;->a; a<-s10;->a; a<-s10;->a;
+    a<-s10;->a; a<-s10;->a; a<-s10;->a;
+    a<-s10;->a; a<-s10;->a; a<-s10;->a;
+    ->loop.
+)
+
+! Remove the denominator once from N if possible.
+N,Nz,ret<<<subden; D,Dz<-<denominator; +loop;(
+  ->loop.
+  <<Dz; tt->ret.
+  <<Nz; ff->ret.
+  <<loop; <>D;<>N; ->loop.
+)
+
+! Main program
+get,set,movl,movr<-<tape;
+len,len_incr<-<counter;
++rewind,compute;(
+  ->rewind;
+  ! Rewind computed decimal expantion.
+  <<rewind; +ret; len,1,ret>->sub; n<-ret; s<-<n; +loop;(
+    ->loop.
+    <<loop; z<-<s; +move;(
+      compute,move>->z.
+      <-move; <>movl; ->loop.
+    )
+  )
+  ! Compute next decimal.
+  <<compute; +getrem,getdiv;(
+    N,Nz<-<numerator; len_s<-<len; N,Nz,len_s>->getrem.
+    ! Get current remainder.
+    N,Nz,len_s<<<getrem; at_end<-<len_s; +t,f;(
+      t,f>->at_end.
+      <-t; N,Nz>->getdiv.
+      <-f; digit<-<get; s<-<digit; <>movr; +loop;(
+        ->loop.
+        <<loop; z<-<s; +t,f;(
+          t,f>->z.
+          <-t; +ret; N,Nz,ret>->times10; X,Xz<-ret; X,Xz,len_s>->getrem.
+          <-f; N,Nz,loop>->subden.
+        )
+      )
+    )
+    ! Divide current remainder.
+    N,Nz<<<getdiv; d,incr<-<counter; +loop;(
+      ->loop.
+      <<loop; +ret; N,Nz,ret>->subden; fits<-ret; +t,f;(
+        t,f>->fits.        
+        <-t; <>incr; ->loop.
+        <-f;
+          +ack; d,ack>->set; <-ack;
+          +ack; d,ack>->write_base10_digit; <-ack;
+          +t,f;(
+            len,t,f>->eq0.
+            <-t; <>len_incr; <>stdout_2E; ->rewind.
+            <-f; <>len_incr; ->rewind.
+        )
+      )
+    )
+  )
+)
+

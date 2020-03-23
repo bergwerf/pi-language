@@ -83,7 +83,7 @@ func main() {
 	err := ErrorList([]error{})
 	proc, unparsed := Parse(full, ioChannelOffset, copyStrIntMap(nil), &err)
 	if len(unparsed) > 0 {
-		fmt.Printf("%v tokens were not parsed", len(unparsed))
+		fmt.Printf("%v tokens were not parsed\n", len(unparsed))
 		return
 	} else if len(err) != 0 {
 		for _, e := range err {

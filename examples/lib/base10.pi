@@ -4,6 +4,7 @@
 
 #global: read_base10
 #global: write_base10
+#global: write_base10_digit
 
 ! Base 10 encoding of numbers: 0_, 1_, 2_, 3_, ...
 
@@ -42,6 +43,20 @@ ret<<read_base10; ,finish,active<-<bool; get,set<-<cell;
   <<stdin__9; 9->add_decimal.
 )
 
+! Print a single digit.
+digit,ready<<<write_base10_digit; s<-<digit;
+       z<-<s; +t,f;(t,f>->z. <-t; <>stdout__0; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__1; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__2; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__3; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__4; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__5; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__6; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__7; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__8; ->ready.
+  <-f; z<-<s; +t,f;(t,f>->z. <-t; <>stdout__9; ->ready.
+  ))))))))))
+
 ! Write decimal number.
 n,ready<<<write_base10; get,set<-<cell; push,pop<-<stack;
 +ack; n,ack>->set; <-ack; +extract_digit,print_digit,finish;(
@@ -55,18 +70,7 @@ n,ready<<<write_base10; get,set<-<cell; push,pop<-<stack;
   ! Print top digit and continue or finish.
   <<print_digit; empty,digit<-<pop; +print;(
     finish,print>->empty;
-    <-print; s,z<-<digit;
-           ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__0; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__1; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__2; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__3; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__4; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__5; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__6; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__7; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__8; ->print_digit.
-      <-f; ->s;zb<-z; +t,f;(t,f>->zb. <-t; <>stdout__9; ->print_digit.
-      ))))))))))
+    <-print; digit,print_digit>->write_base10_digit.
   )
   
   ! Print underscore and trigger ready.

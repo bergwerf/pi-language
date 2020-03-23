@@ -24,28 +24,34 @@
 #global: read_base1
 #global: write_base1
 
-! Numbers have a counter interface with a step channel and a zero channel which
-! will return ff or tt (if it is the last step).
-c<<0;  +s,z->c; <-s;tt->z.
-c<<1;  +s,z->c; <-s;ff->z; <-s;tt->z.
-c<<2;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;tt->z.
-c<<3;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
-c<<4;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
-c<<5;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
-c<<6;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
-c<<7;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
-c<<8;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
-c<<9;  +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
-c<<10; +s,z->c; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;ff->z; <-s;tt->z.
+! Numbers return a step channel which will return ff or tt if there are no more
+! steps (after which the step channel no longer responds).
+c<<0;  +s->c; a<-s;tt->a.
+c<<1;  +s->c; a<-s;ff->a; a<-s;tt->a.
+c<<2;  +s->c; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a.
+c<<3;  +s->c; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a.
+c<<4;  +s->c; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a.
+c<<5;  +s->c; a<-s;ff->a; a<-s;ff->a;
+  a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a.
+c<<6;  +s->c; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a;
+  a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a.
+c<<7;  +s->c; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a;
+  a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a; a<-s;ff->a.
+c<<8;  +s->c; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a;
+  a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a.
+c<<9;  +s->c; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a;
+  a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a; a<-s;ff->a.
+c<<10; +s->c; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a;
+  a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;ff->a; a<-s;tt->a.
 
 ! Zero-check if statement
-n,t,f<<<eq0; s,z<-<n; ->s; is_zero<-z; t,f>->is_zero.
+n,t,f<<<eq0; s<-<n; is_zero<-<s; t,f>->is_zero.
 
 ! Increment
-n,ret<<<incr; +k->ret; c<<k; ns,nz<-<n; +s,z->c; <-s;ff->z;(s>>ns. nz>>z.)
+n,ret<<<incr; +k->ret; c<<k; ns<-<n; +s->c; a<-s;ff->a; s>>ns.
 
 ! Unsafe decrement (no zero check)
-n,ret<<<decr; +k->ret; c<<k; ns,nz<-<n; ->ns;<-nz; ns,nz->c.
+n,ret<<<decr; +k->ret; c<<k; s<-<n; <>s; s->c.
 
 ! Counter
 c<<counter; get,set<-<cell; +value,increment,reset;(
@@ -55,11 +61,11 @@ c<<counter; get,set<-<cell; +value,increment,reset;(
   ack<<reset; 0,ack>->set.
 )
 
-! Create number from a step and zero channel.
-s,z,ret<<<count; k,incr<-<counter; +loop;(
+! Create number from a step channel.
+s,ret<<<count; k,incr<-<counter; +loop;(
   ->loop.
-  <<loop; ->s; is_zero<-z; +t,f;(
-    t,f>->is_zero.
+  <<loop; z<-<s; +t,f;(
+    t,f>->z.
     <-t; k->ret.
     <-f; <>incr; ->loop.
   )
@@ -67,29 +73,29 @@ s,z,ret<<<count; k,incr<-<counter; +loop;(
 
 ! Addition
 n,m,ret<<<add; +k->ret;
-c<<k; ns,nz<-<n; ms,mz<-<m; ,next,stage<-<bool; +step,zero->c;
-<<step; +use_n,use_m;(
+c<<k; ns<-<n; ms<-<m; ,next,stage<-<bool; +step->c;
+a<<step; +use_n,use_m;(
   use_n,use_m>->stage.
-  <-use_n; ->ns; is_zero<-nz; +t,f;(
-    t,f>->is_zero.
-    <-t; <>next; ->step.
-    <-f; ff->zero.
+  <-use_n; z<-<ns; +t,f;(
+    t,f>->z.
+    <-t; <>next; a->step.
+    <-f; ff->a.
   )
-  <-use_m; ->ms; is_zero<-mz; +t,f;(
-    t,f>->is_zero.
-    <-t; tt->zero.
-    <-f; ff->zero.
+  <-use_m; z<-<ms; +t,f;(
+    t,f>->z.
+    <-t; tt->a.
+    <-f; ff->a.
   )
 )
 
 ! Subtraction (returns result and if m fits in n)
-n,m,ret<<<sub; ns,nz<-<n; ms,mz<-<m; +loop;(
+n,m,ret<<<sub; ns<-<n; ms<-<m; +loop;(
   ->loop.
-  <<loop; ->ns;zn<-nz; ->ms;zm<-mz; +t_t,t_f,f_t,f_f;(
-    zn,zm,t_t,t_f,f_t,f_f>->dual_if.
+  <<loop; nz<-<ns; mz<-<ms; +t_t,t_f,f_t,f_f;(
+    nz,mz,t_t,t_f,f_t,f_f>->dual_if.
     <-t_t; 0,tt->ret.
     <-t_f; 0,ff->ret.
-    <-f_t; +ans; ns,nz,ans>->count; k<-ans; k,ans>->incr; k<-ans; k,tt->ret.
+    <-f_t; +ans; ns,ans>->count; k<-ans; k,ans>->incr; k<-ans; k,tt->ret.
     <-f_f; ->loop.
   )
 )
@@ -106,9 +112,9 @@ n,m,ret<<<div; get,set<-<cell; k,k_incr<-<counter;
 )
 
 ! Multiplication
-n,m,ret<<<mul; get,set<-<cell; +ack; 0,ack>->set; <-ack; ns,nz<-<n; +loop;(
+n,m,ret<<<mul; get,set<-<cell; +ack; 0,ack>->set; <-ack; ns<-<n; +loop;(
   ->loop.
-  <<loop; acc<-<get; ->ns; is_zero<-nz; +return,add_m;(
+  <<loop; acc<-<get; is_zero<-<ns; +return,add_m;(
     return,add_m>->is_zero.
     <-return; acc->ret.
     <-add_m;
@@ -123,13 +129,16 @@ n,m,ret<<<mul; get,set<-<cell; +ack; 0,ack>->set; <-ack; ns,nz<-<n; +loop;(
 ! Read base 1 number from stdin.
 ret<<read_base1; ,finish,active<-<bool; n,incr<-<counter;(
   ->stdin_read.
-  <-stdin__0; <>finish; n->ret.
+  <-stdin_5F; <>finish; n->ret.
   <<stdin__1; +do;(do,>->active. <-do; <>incr; ->stdin_read.)
 )
 
 ! Write base 1 number to stdout.
-n,ready<<<write_base1; step,zero<-<n; ->step; is_zero<<zero; +t,f;(
-  t,f>->is_zero.
-  <-t; <>stdout__0; ->ready.
-  <-f; <>stdout__1; ->step.
+n,ready<<<write_base1; s<-<n; +loop;(
+  ->loop;
+  <<loop; is_zero<-<s; +t,f;(
+    t,f>->is_zero.
+    <-t; <>stdout_5F; ->ready.
+    <-f; <>stdout__1; ->loop.
+  )
 )
